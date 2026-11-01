@@ -35,7 +35,8 @@ from app.models.workspace import Workspace
 
 from app.api.dependencies import (
     get_db, get_agent_or_404, agent_mtls_or_user_auth, require_admin,
-    get_current_user, get_agent_from_mtls, ExecutorOuUsuario, _parse_traefik_client_cert,
+    get_current_user, ExecutorOuUsuario, _parse_traefik_client_cert,
+    RenovacaoRepetida, get_agent_from_mtls_or_renewal_replay, _serial_to_int,
 )
 from app.core.executor_connections import executor_registry
 from app.api.routers.executor_ws.protocolo import _coerce_count, _coerce_gauge
@@ -1025,6 +1026,63 @@ def _executor_key_from_mtls(request: Request) -> str:
     return f"cert:{cn}" if cn else _client_key(request)
 
 
+# A renewal's answer can be lost after the server already swapped the serial
+# (read timeout, a proxy restart). The executor then repeats the SAME CSR with
+# its old certificate, and gets the same bundle back instead of being locked
+# out until a new OTP. Only an exact repeat (same executor, same old serial,
+# same CSR) within this window is answered; the executor gives up resuming
+# after 25 min (executor/renewal.py, _PENDING_MAX_AGE_S).
+_JANELA_DE_REPETICAO_S = 30 * 60
+
+
+def _chave_de_repeticao(executor_id: str) -> str:
+    return f"renew_replay:{executor_id}"
+
+
+def _hash_do_csr(csr_pem: str) -> str:
+    import hashlib
+    return hashlib.sha256(csr_pem.strip().encode()).hexdigest()
+
+
+async def _guardar_repeticao(executor_id: str, serial_anterior, csr_pem: str, resposta: dict) -> None:
+    import json
+    from app.core.redis import get_redis_pool
+    try:
+        await get_redis_pool().setex(
+            _chave_de_repeticao(executor_id),
+            _JANELA_DE_REPETICAO_S,
+            json.dumps({
+                "serial_anterior": _serial_to_int(serial_anterior, source="db"),
+                "csr": _hash_do_csr(csr_pem),
+                "resposta": resposta,
+            }),
+        )
+    except Exception as exc:
+        # Without the record the renewal still worked; only the recovery from
+        # a lost answer is gone.
+        logger.warning("Renovacao de '%s' sem registro de repeticao: %s", executor_id, exc)
+
+
+async def _resposta_repetida(pedido: "RenovacaoRepetida", csr_pem: str) -> "dict | None":
+    import json
+    from app.core.redis import get_redis_pool
+    try:
+        bruto = await get_redis_pool().get(_chave_de_repeticao(pedido.executor_id))
+    except Exception:
+        return None
+    if not bruto:
+        return None
+    try:
+        dados = json.loads(bruto)
+    except (TypeError, ValueError):
+        return None
+    if dados.get("serial_anterior") != _serial_to_int(pedido.serial, source="header"):
+        return None
+    if dados.get("csr") != _hash_do_csr(csr_pem):
+        return None
+    return dados.get("resposta")
+
+
 @router.post("/renew-cert",
              response_model=EnrollResponse,
              summary="[Executor] Renovar cert mTLS antes do vencimento")
@@ -1036,13 +1094,23 @@ async def agent_renew_cert(
     request: Request,
     payload: RenewRequest,
     db: AsyncSession = Depends(get_db),
-    executor=Depends(get_agent_from_mtls),
+    executor=Depends(get_agent_from_mtls_or_renewal_replay),
 ):
     """
     Renews the cert using the current valid cert + a new CSR. Without mTLS returns 401.
     If the executor is revoked while step-ca is signing, the new cert is
     discarded and the response is 409.
     """
+    if isinstance(executor, RenovacaoRepetida):
+        repetida = await _resposta_repetida(executor, payload.csr_pem)
+        if repetida is None:
+            raise HTTPException(status_code=401, detail="Cert mTLS nao corresponde ao registrado.")
+        logger.warning(
+            "Executor '%s' repetiu a renovacao (a resposta anterior se perdeu); "
+            "devolvendo o mesmo certificado.", executor.executor_id,
+        )
+        return EnrollResponse(**repetida)
+
     try:
         executor_enrollment_service.parse_and_validate_csr(payload.csr_pem)
     except ValueError as exc:
@@ -1086,7 +1154,7 @@ async def agent_renew_cert(
         )
     logger.info("Executor '%s' renovou cert: serial novo '%s'.", executor.id_hash, cert_data["serial"])
 
-    return EnrollResponse(
+    resposta = EnrollResponse(
         cert_pem=cert_data["cert_pem"],
         chain_pem=cert_data["chain_pem"],
         ca_pem=cert_data["ca_pem"],
@@ -1096,6 +1164,11 @@ async def agent_renew_cert(
         expires_at=cert_data["expires_at"],
         server_signing_public_key=get_server_signing_public_key_b64(),
     )
+    await _guardar_repeticao(
+        executor.id_hash, executor.cert_serial, payload.csr_pem,
+        resposta.model_dump(mode="json"),
+    )
+    return resposta
 
 
 @router.delete("/admin/executores/{executor_id}/cert", status_code=204,

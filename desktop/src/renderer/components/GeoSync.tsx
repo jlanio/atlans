@@ -587,6 +587,7 @@ export const GeoSync = memo(function GeoSync({
   const [loadingWs, setLoadingWs] = useState(false)
   const [invalidas, setInvalidFolders] = useState<InvalidFolder[]>([])
   const [salvo, setSaved] = useState(false)
+  const [erroSalvar, setSaveError] = useState<string | null>(null)
   /**
    * Direction chosen before switching to "manter apenas no executor" (keep
    * only on the executor).
@@ -649,7 +650,7 @@ export const GeoSync = memo(function GeoSync({
     return <p className="text-sm text-muted-foreground">Carregando…</p>
   }
 
-  const patch = (p: Partial<ConfigGeoSync>) => { setCfg({ ...cfg, ...p }); setSaved(false) }
+  const patch = (p: Partial<ConfigGeoSync>) => { setCfg({ ...cfg, ...p }); setSaved(false); setSaveError(null) }
 
   const catalogOnly = cfg.modo === 'catalog'
 
@@ -690,6 +691,7 @@ export const GeoSync = memo(function GeoSync({
   async function salvar() {
     const r = await window.atlas.salvarGeosync(cfg!)
     setInvalidFolders(r.invalidas)
+    setSaveError(r.erro ?? null)
     if (r.salvo) {
       const atual = await window.atlas.geosync()
       setCfg(atual)
@@ -1004,9 +1006,10 @@ export const GeoSync = memo(function GeoSync({
 
       <BarraSalvar
         mudou={sujo} salvo={salvo}
+        erro={erroSalvar}
         rodando={rodando}
         aoSalvar={salvar}
-        aoDescartar={() => { setCfg(JSON.parse(original)); setSaved(false) }}
+        aoDescartar={() => { setCfg(JSON.parse(original)); setSaved(false); setSaveError(null) }}
       />
     </div>
   )

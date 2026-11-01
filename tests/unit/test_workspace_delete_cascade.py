@@ -157,7 +157,7 @@ async def test_delete_marks_workspace_before_the_committing_helper(client, mock_
         visto["ws_deleted_at_no_cascade"] = ws.deleted_at
         return {"workflows": 1, "schedules": 1}
 
-    async def _fake_expiry(_db, _ws_id):
+    async def _fake_expiry(_db, _ws_id, **_kw):
         # Internal commit point: whatever is dirty here gets committed along with it.
         visto["ws_deleted_at_no_commit_interno"] = ws.deleted_at
         return {"artifacts": 0, "drive_files": 0}
@@ -272,3 +272,81 @@ async def test_restore_keeps_the_name_when_nobody_took_it():
     # No rename: the only write is the one that clears `deleted_at`.
     assert db.execute.await_count == 3
     assert "name" not in db.execute.await_args.args[0].compile().params
+
+
+# ── Artifacts on delete / restore (review of 2026-10-31) ─────────────────────
+
+async def test_restore_brings_the_expired_artifacts_back_to_retention(monkeypatch):
+    """The delete stamps `expires_at = deleted_at`; a restore before the cleanup
+    ran must give them back their retention instead of letting it delete them."""
+    from datetime import timedelta
+    from types import SimpleNamespace
+
+    from app.services import storage_purge_service as S
+
+    criado = _DELETED_AT - timedelta(days=2)
+    artefatos = [SimpleNamespace(created_at=criado, expires_at=_DELETED_AT)]
+    resultado = MagicMock()
+    resultado.scalars.return_value = artefatos
+    db = AsyncMock()
+    db.execute = AsyncMock(return_value=resultado)
+
+    async def _dias(_db):
+        return 30
+
+    monkeypatch.setattr("app.core.run_result_consumer._get_retention_days", _dias)
+    assert await S.restore_workspace_data_expiry(db, "ws-1", _DELETED_AT) == 1
+    assert artefatos[0].expires_at == criado + timedelta(days=30)
+
+    async def _sem_retencao(_db):
+        return None
+
+    artefatos[0].expires_at = _DELETED_AT
+    monkeypatch.setattr("app.core.run_result_consumer._get_retention_days", _sem_retencao)
+    await S.restore_workspace_data_expiry(db, "ws-1", _DELETED_AT)
+    assert artefatos[0].expires_at is None
+
+
+async def test_the_delete_keeps_an_earlier_removal_mark(monkeypatch):
+    """An artifact the user already removed carries an earlier mark; the
+    workspace delete must not overwrite it with its own — a restore matches
+    that mark and would bring the removed artifact back (fix review)."""
+    from datetime import timedelta
+
+    from sqlalchemy import select
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from app.models.artifact import Artifact
+    from app.models.base import Base
+    from app.services import storage_purge_service as S
+
+    async def _sem_drive(_db, _ws, scope="all"):
+        return {"drive_files": 0}
+
+    monkeypatch.setattr(S, "purge_workspace_storage", _sem_drive)
+    engine = create_async_engine("sqlite+aiosqlite://")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all, tables=[Artifact.__table__])
+    fabrica = async_sessionmaker(engine, expire_on_commit=False)
+    removido_em = _DELETED_AT - timedelta(minutes=5)
+    futuro = _DELETED_AT + timedelta(days=30)
+    async with fabrica() as db:
+        def _art(nome, expira, pin=False):
+            return Artifact(id_hash=nome, workspace_id="ws-1", output_key=nome, filename=nome,
+                            expires_at=expira, is_pinned=pin)
+        db.add_all([
+            _art("sem-prazo", None), _art("retencao", futuro),
+            _art("removido", removido_em), _art("pin", None, pin=True),
+        ])
+        await db.commit()
+
+        await S.schedule_workspace_data_expiry(db, "ws-1", deleted_at=_DELETED_AT)
+        await db.commit()
+        prazos = {a.id_hash: a.expires_at for a in (await db.execute(select(Artifact))).scalars()}
+    await engine.dispose()
+
+    assert prazos == {
+        "sem-prazo": _DELETED_AT, "retencao": _DELETED_AT,
+        "removido": removido_em,     # kept: the restore will not bring it back
+        "pin": None,
+    }

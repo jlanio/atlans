@@ -43,8 +43,15 @@ HOW the XFF has to be read:
 Variables (comma-separated IPs and CIDRs, e.g. `172.16.0.0/12,10.0.0.0/8`):
 
 - `TRUSTED_PROXIES`: proxies that talk DIRECTLY to the API (the Traefik network).
-  It is what authorizes the mTLS cert header and reading the XFF. Empty disables
-  both checks — useful in dev, where the API is accessed directly without a proxy.
+  It is what authorizes reading the XFF and, without `MTLS_PROXIES`, the mTLS
+  cert header. Empty disables both checks — useful in dev, where the API is
+  accessed directly without a proxy.
+- `MTLS_PROXIES`: the ONLY peers allowed to present the mTLS cert header — Traefik
+  alone. TRUSTED_PROXIES cannot be that narrow: the web container also talks to
+  the API directly (the /terra proxy) and its XFF has to count, or every user
+  would share its rate limit bucket — but the web must never vouch for an
+  executor's identity. Absent or empty = `TRUSTED_PROXIES`, as before. Set with
+  no valid entry, NO peer is accepted (a typo must not open the header to all).
 - `EDGE_PROXIES`: EDGE proxies that append the client to the XFF (Cloudflare).
   They are skipped in the right -> left walk and nothing more: they do NOT vouch
   for the mTLS cert header (`is_trusted_proxy` only looks at `TRUSTED_PROXIES` —
@@ -95,6 +102,15 @@ def _parse_networks(raw: str, var: str) -> list[ipaddress.IPv4Network | ipaddres
 
 TRUSTED_PROXIES = _parse_networks(os.getenv("TRUSTED_PROXIES", ""), "TRUSTED_PROXIES")
 
+# None = not configured: the mTLS header follows TRUSTED_PROXIES (`is_mtls_proxy`).
+_mtls_raw = os.getenv("MTLS_PROXIES", "").strip()
+MTLS_PROXIES = _parse_networks(_mtls_raw, "MTLS_PROXIES") if _mtls_raw else None
+if MTLS_PROXIES == []:
+    logger.error(
+        "MTLS_PROXIES sem nenhuma entrada valida: nenhum header de cert mTLS "
+        "sera aceito (executores recebem 401)."
+    )
+
 # An ABSENT variable (None) is different from an EMPTY one (""): without it the
 # Cloudflare list applies; an explicit `EDGE_PROXIES=` means "no edge proxy".
 _edge_raw = os.getenv("EDGE_PROXIES")
@@ -136,6 +152,24 @@ def is_trusted_proxy(client_host: str | None) -> bool:
     except ValueError:
         return False
     return _in_any(addr, TRUSTED_PROXIES)
+
+
+def is_mtls_proxy(client_host: str | None) -> bool:
+    """True if the TCP peer may present the executor's mTLS cert header.
+
+    `MTLS_PROXIES` when configured (in the compose file, Traefik's fixed IP);
+    otherwise the same answer as `is_trusted_proxy`. A configured list with no
+    valid entry accepts no one.
+    """
+    if MTLS_PROXIES is None:
+        return is_trusted_proxy(client_host)
+    if not client_host:
+        return False
+    try:
+        addr = ipaddress.ip_address(client_host)
+    except ValueError:
+        return False
+    return _in_any(addr, MTLS_PROXIES)
 
 
 def get_client_ip(client_host: str | None, forwarded_for: str | None) -> str:

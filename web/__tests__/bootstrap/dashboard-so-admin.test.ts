@@ -128,6 +128,26 @@ describe("portão de sessão: a Home abre sem sessão; o resto vai para a entrad
   it("arquivos do public/ passam sem sessão", async () => {
     expect(await destino("/logo.svg", null)).toBeNull()
     expect(await destino("/manifest.webmanifest", null)).toBeNull()
+    expect(await destino("/icon.png", null)).toBeNull()
+    // The public subfolders: the share portal (anonymous) loads MapLibre's
+    // worker from public/maplibre; public/monaco is also outside the matcher.
+    expect(await destino("/maplibre/maplibre-gl-worker.mjs", null)).toBeNull()
+    expect(await destino("/monaco/vs/loader.js", null)).toBeNull()
+  })
+
+  it("rota dinâmica com extensão de asset NÃO pula o portão de sessão", async () => {
+    // Dynamic routes match any segment: these render the dashboard shell. The
+    // extension alone used to let an anonymous visitor through.
+    for (const p of ["/workflow/x.png", "/observability/run/x.svg", "/observability/abc.js", "/projects/a/b.css"]) {
+      const loc = await destino(p, null)
+      expect(caminho(loc), p).toBe("/")
+      expect(new URL(loc as string).searchParams.get("entrar"), p).toBe("1")
+    }
+  })
+
+  it("extensão de asset sob /admin NÃO pula o portão de papel", async () => {
+    expect(caminho(await destino("/admin/x.png", "user"))).toBe("/")
+    expect(caminho(await destino("/admin/users/logo.svg", "user"))).toBe("/")
   })
 
   it("o proxy /terra nunca é redirecionado, nem sem sessão", async () => {

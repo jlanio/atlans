@@ -67,6 +67,8 @@ class SaveToS3Node(BaseNode):
     treated as that token.
     """
 
+    TEM_EFEITO_COLATERAL = True
+
     @classmethod
     def description(cls) -> Dict[str, Any]:
         return {

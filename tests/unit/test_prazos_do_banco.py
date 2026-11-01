@@ -104,7 +104,29 @@ def test_the_timeouts_reach_asyncpg_connect_without_losing_ssl():
         DATABASE_URL="postgresql+asyncpg://u:p@127.0.0.1:1/x",  # pragma: allowlist secret
         DB_STATEMENT_TIMEOUT="45", DB_COMMAND_TIMEOUT="70",
     )
-    assert lido == {"server_settings": {"statement_timeout": "45000"}, "command_timeout": 70, "ssl": "False"}
+    assert lido == {
+        "server_settings": {"statement_timeout": "45000", "timezone": "UTC"},
+        "command_timeout": 70,
+        "ssl": "False",
+    }
+
+
+def test_the_session_is_utc_even_without_timeouts():
+    """`now()` in TIMESTAMP columns follows the session's time zone: the server's
+    unless the connection says otherwise (see `_utc_session`)."""
+    lido = _in_new_process(
+        _CONNECT_CAPTURE,
+        DATABASE_URL="postgresql+asyncpg://u:p@127.0.0.1:1/x?ssl=require",  # pragma: allowlist secret
+        DB_STATEMENT_TIMEOUT="0", DB_COMMAND_TIMEOUT="0",
+    )
+    assert lido["server_settings"] == {"timezone": "UTC"}
+    assert lido["ssl"].startswith("<ssl.SSLContext")
+
+
+def test_utc_session_keeps_the_other_settings():
+    args = db._utc_session({"ssl": False, "server_settings": {"statement_timeout": "1000"}})
+    assert args == {"ssl": False, "server_settings": {"statement_timeout": "1000", "timezone": "UTC"}}
+    assert db._utc_session({}) == {"server_settings": {"timezone": "UTC"}}
 
 
 @pytest.mark.parametrize("bruto, esperado", [

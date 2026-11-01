@@ -19,6 +19,31 @@ function rotaSoAdmin(pathname: string): boolean {
   return ROTAS_SO_ADMIN.some((rota) => pathname === rota || pathname.startsWith(rota + "/"))
 }
 
+/** Only STATIC ASSET extensions. The old pattern (any `.ext`) let a path like
+ *  `/algo.json` slip past the gate; the allowlist closes that bypass (SEG-120). */
+const EXTENSAO_DE_ARQUIVO = /\.(?:js|mjs|css|map|png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|wasm|txt|xml|webmanifest|pdf)$/i
+
+/** The subfolders of `web/public` (copied by scripts/copiar-monaco.mjs and
+ *  copiar-maplibre.mjs). `monaco/` is also outside the matcher; `maplibre/` is
+ *  not, and the anonymous share portal loads its worker from there. */
+const PASTAS_PUBLICAS = ["/monaco/", "/maplibre/"] as const
+
+/**
+ * A file served from `public/` (or a root metadata route such as /icon.png):
+ * it is not a page and passes without session or role.
+ *
+ * The extension alone is not enough: dynamic routes match any segment, so
+ * `/workflow/x.png` or `/observability/run/x.svg` RENDER the dashboard shell —
+ * and passed the login gate (and `/admin/x.png` the role gate) for an anonymous
+ * visitor. Only where a public file can actually be: the root (a single
+ * segment, which no page has with an extension) and the public subfolders.
+ */
+function arquivoPublico(pathname: string): boolean {
+  if (!EXTENSAO_DE_ARQUIVO.test(pathname)) return false
+  if (pathname.lastIndexOf("/") === 0) return true
+  return PASTAS_PUBLICAS.some((pasta) => pathname.startsWith(pasta))
+}
+
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const { pathname } = req.nextUrl;
@@ -39,10 +64,8 @@ export default auth((req) => {
 
   if (!isApiProxy) {
     // The files in `public/` are not pages: they pass without session or role.
-    // Only STATIC ASSET extensions bypass the session/role gate. The old
-    // pattern (any `.ext`) let a path like `/algo.json` slip past the gate;
-    // restricting it to the allowlist closes that bypass (SEG-120).
-    const looksLikeFile = /\.(?:js|mjs|css|map|png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|wasm|txt|xml|webmanifest|pdf)$/i.test(pathname);
+    // See `arquivoPublico` for what counts as one.
+    const looksLikeFile = arquivoPublico(pathname);
 
     // Without a session (or with an expired refresh token), every PAGE other than
     // the Home goes to the entry — which is the Home itself with the login modal

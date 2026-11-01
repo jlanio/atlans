@@ -41,6 +41,7 @@ from app.core.utils.logger import get_logger
 from app.mcp import infra
 from app.mcp.guardas import GUARDAS
 from app.mcp.resolucao import carregar_workflow
+from app.services.assistente_efeitos import nos_que_agem, urls_lidas
 from app.services.assistente_service import (
     EstadoDoLaco,
     Evento,
@@ -242,16 +243,27 @@ def _answers_frame(argumentos: Any) -> list[Evento]:
 # confirmable, and freeing it requires an explicit name here.
 CONFIRMAVEIS_SE_FLUXO_DA_PESSOA: frozenset[str] = frozenset({"update_workflow", "run_workflow"})
 
-# The allowlist: the ONLY writes the assistant makes without a click. Two are the
-# path for it to build its OWN workflows — `validate_workflow` writes nothing
-# (it simulates), and `create_workflow` is born `origem="assistente"`, hidden from
-# the person's listings. Neither of the two touches what already existed. The
-# third, `register_source`, is the owner's decision: saving to the catalog a
-# source that the probe confirmed is cheap, reversible and executes nothing — and
-# asking for a click on every new source would bring back the cost the catalog
-# came to remove. `probe_source` comes in for the same reason: probing is free
-# (metadata only; it updates the state of an already cataloged source).
-ESCRITAS_SEM_CLIQUE: frozenset[str] = frozenset({"validate_workflow", "create_workflow", "probe_source", "register_source"})
+# A third rule, on top of both lists: the assistant's OWN workflow is free only
+# while it just reads and transforms. Creating, changing or running one whose
+# definition acts outside (sends, writes, publishes, fires on its own, uses a
+# stored credential — `assistente_efeitos.nos_que_agem`) asks for the click too.
+# The model's prompt carries text nobody here controls (WFS metadata, Drive
+# names, other members' descriptions), and the prompt was the only barrier
+# between that text and an e-mail, a webhook or a database write.
+CONFIRMAVEIS_SE_O_FLUXO_AGE: frozenset[str] = frozenset({"create_workflow"})
+
+# The allowlist: the ONLY writes the assistant makes without a click.
+# `validate_workflow` writes nothing (it simulates). `register_source` is the
+# owner's decision: saving to the catalog a source that the probe confirmed is
+# cheap, reversible and executes nothing — and asking for a click on every new
+# source would bring back the cost the catalog came to remove. `probe_source`
+# comes in for the same reason: probing is free (metadata only; it updates the
+# state of an already cataloged source). Both still ask for the click when the
+# URL is NOT already in the catalog (`_fonte_fora_do_catalogo`): a request to a
+# host and path the model chose is not "probing what we know".
+# `create_workflow` left this list: it is free only while the definition does
+# not act outside (CONFIRMAVEIS_SE_O_FLUXO_AGE).
+ESCRITAS_SEM_CLIQUE: frozenset[str] = frozenset({"validate_workflow", "probe_source", "register_source"})
 
 CONFIRMAVEIS_SEMPRE: frozenset[str] = frozenset(
     nome
@@ -259,6 +271,7 @@ CONFIRMAVEIS_SEMPRE: frozenset[str] = frozenset(
     if not guarda.read_only
     and nome not in ESCRITAS_SEM_CLIQUE
     and nome not in CONFIRMAVEIS_SE_FLUXO_DA_PESSOA
+    and nome not in CONFIRMAVEIS_SE_O_FLUXO_AGE
 )
 
 
@@ -289,6 +302,28 @@ def chave_de_confirmacao(user_id: str, conversa_id: str | None, tool_use_id: str
     return f"agente:confirmacao:{user_id}:{conversa_id or 'novo'}:{tool_use_id}"
 
 
+async def _target_workflow(estado: EstadoDoLaco, argumentos: Any) -> tuple[bool, Any]:
+    """(belongs to the person, its STORED definition).
+
+    Same fail-closed reading as `_workflow_belongs_to_person`, which it serves:
+    no clear target or a load error answers "the person's" — and then the click
+    is asked anyway, so the definition does not matter.
+    """
+    ref = argumentos.get("workflow_id") if isinstance(argumentos, dict) else None
+    if not ref:
+        return True, None
+    try:
+        async with infra.sessao() as db:
+            wf, _role = await carregar_workflow(db, estado.escopo, str(ref))
+            # Read INSIDE the block (see `_workflow_belongs_to_person`).
+            origem = getattr(wf, "origem", "usuario")
+            definicao = getattr(wf, "definition", None)
+    except Exception:
+        logger.exception("Nao foi possivel ler o fluxo %s; exigindo clique.", ref)
+        return True, None
+    return origem != "assistente", definicao
+
+
 async def _workflow_belongs_to_person(estado: EstadoDoLaco, argumentos: Any) -> bool:
     """True when the target is NOT one of the assistant's own workflows — so it asks for a click.
 
@@ -308,25 +343,134 @@ async def _workflow_belongs_to_person(estado: EstadoDoLaco, argumentos: Any) -> 
     workflows — which is the Home's entire path (create the workflow, run it,
     send the layer to the globe).
     """
-    ref = argumentos.get("workflow_id") if isinstance(argumentos, dict) else None
-    if not ref:
+    da_pessoa, _definicao = await _target_workflow(estado, argumentos)
+    return da_pessoa
+
+
+def _definition_arg(argumentos: Any) -> Any:
+    return argumentos.get("definition") if isinstance(argumentos, dict) else None
+
+
+async def _fonte_fora_do_catalogo(estado: EstadoDoLaco, argumentos: Any) -> bool:
+    """Is the URL of a `probe_source`/`register_source` outside the workspace's catalog?
+
+    Inside the catalog, probing again is the free maintenance the owner chose.
+    Outside it, the call is a request to a host, path and query the model wrote
+    — possibly read from untrusted text — and that asks for the click. Fails
+    CLOSED: no URL to compare, or a lookup error, means "outside"."""
+    url = argumentos.get("url") if isinstance(argumentos, dict) else None
+    if not isinstance(url, str) or not url.strip():
         return True
     try:
+        from app.services import fontes_service
+
         async with infra.sessao() as db:
-            wf, _role = await carregar_workflow(db, estado.escopo, str(ref))
-            origem = getattr(wf, "origem", "usuario")
+            return not await fontes_service.url_no_catalogo(db, estado.escopo, url)
     except Exception:
-        logger.exception("Nao foi possivel ler a origem do fluxo %s; exigindo clique.", ref)
+        logger.exception("Nao foi possivel consultar o catalogo; exigindo clique.")
         return True
-    return origem != "assistente"
 
 
-async def _confirmavel(estado: EstadoDoLaco, nome: str, argumentos: Any) -> bool:
+# A URL the person confirmed once stays approved for THEM: re-running the same
+# workflow (or another reading the same file) does not ask again. The exact
+# literal URL — a query string that changes is another request.
+TTL_DA_URL_APROVADA_S = 30 * 24 * 60 * 60
+
+
+def chave_da_url_aprovada(user_id: str, url: str) -> str:
+    import hashlib
+
+    digest = hashlib.sha256(url.strip().encode("utf-8")).hexdigest()
+    return f"agente:url_aprovada:{user_id}:{digest}"
+
+
+async def aprovar_urls(redis, user_id: str, urls: Any) -> None:
+    """Records the URLs of a confirmed run as approved by this person. Best-effort."""
+    if redis is None or not isinstance(urls, list):
+        return
+    for url in urls:
+        if isinstance(url, str) and url.strip():
+            try:
+                await redis.set(chave_da_url_aprovada(user_id, url), "1", ex=TTL_DA_URL_APROVADA_S)
+            except Exception as exc:  # pragma: no cover - depends on Redis
+                logger.warning("Aprovacao da URL nao gravada: %s", exc.__class__.__name__)
+
+
+async def _url_aprovada(estado: EstadoDoLaco, url: str) -> bool:
+    if estado.redis is None:
+        return False
+    try:
+        return bool(await estado.redis.get(chave_da_url_aprovada(estado.escopo.user_id, url)))
+    except Exception:
+        return False
+
+
+async def _urls_fora_do_catalogo(estado: EstadoDoLaco, definicao: Any) -> list[tuple[str, str]]:
+    """(label, URL) of the URL-reading nodes whose literal URL is neither in the
+    catalog nor approved by this person — the same request a `probe_source` of
+    that URL would ask a click for. Fails CLOSED: a lookup error counts every
+    URL as outside."""
+    urls = urls_lidas(definicao)
+    if not urls:
+        return []
+    try:
+        from app.services import fontes_service
+
+        fora: list[tuple[str, str]] = []
+        async with infra.sessao() as db:
+            for rotulo, url in urls:
+                if await fontes_service.url_no_catalogo(db, estado.escopo, url):
+                    continue
+                if await _url_aprovada(estado, url):
+                    continue
+                fora.append((rotulo, url))
+        return fora
+    except Exception:
+        logger.exception("Nao foi possivel consultar o catalogo; exigindo clique.")
+        return list(urls)
+
+
+async def _confirmavel(
+    estado: EstadoDoLaco, nome: str, argumentos: Any,
+) -> tuple[bool, list[str], list[str]]:
+    """(asks for the click, the acting nodes the card shows, the URLs a click approves).
+
+    The catalog is consulted on RUN only: creating or changing a workflow
+    fetches no URL, and asking there too made one file read cost two clicks."""
     if nome in CONFIRMAVEIS_SEMPRE:
-        return True
+        return True, [], []
+    if nome in CONFIRMAVEIS_SE_O_FLUXO_AGE:
+        efeitos = nos_que_agem(_definition_arg(argumentos), disparos=True)
+        return bool(efeitos), efeitos, []
     if nome in CONFIRMAVEIS_SE_FLUXO_DA_PESSOA:
-        return await _workflow_belongs_to_person(estado, argumentos)
-    return False
+        da_pessoa, guardada = await _target_workflow(estado, argumentos)
+        if nome == "update_workflow":
+            # What matters is what the workflow WILL do: the new definition.
+            # A rename (no definition) keeps the stored one.
+            nova = _definition_arg(argumentos)
+            efeitos = nos_que_agem(nova if nova is not None else guardada, disparos=True)
+            return (da_pessoa or bool(efeitos)), efeitos, []
+        # Running creates no schedule: the triggers do not count here.
+        efeitos = nos_que_agem(guardada, disparos=False)
+        fora = await _urls_fora_do_catalogo(estado, guardada)
+        efeitos = [*efeitos, *(rotulo for rotulo, _url in fora)]
+        return (da_pessoa or bool(efeitos)), efeitos, [url for _rotulo, url in fora]
+    if nome in ("probe_source", "register_source"):
+        return await _fonte_fora_do_catalogo(estado, argumentos), [], []
+    return False, [], []
+
+
+def _card_action(nome: str, argumentos: Any, efeitos: list[str] | None = None) -> dict[str, Any]:
+    """What the confirmation card shows: the tool, the summarized arguments, the
+    target and — when the workflow acts outside — which nodes do it, so the
+    person sees WHY the click is being asked. `efeitos` comes from the gate
+    (it also knows the STORED definition of a run); without it, the definition
+    in the arguments is judged."""
+    acao: dict[str, Any] = {"tool": nome, "argumentos": _summarize(argumentos), "alvo": _target(argumentos)}
+    agem = efeitos if efeitos is not None else nos_que_agem(_definition_arg(argumentos))
+    if agem:
+        acao["efeitos"] = agem[:20]
+    return acao
 
 
 def _target(argumentos: Any) -> str | None:
@@ -341,7 +485,8 @@ def _target(argumentos: Any) -> str | None:
 
 
 async def _ask_confirmation(
-    estado: EstadoDoLaco, nome: str, argumentos: Any, tool_use_id: str | None
+    estado: EstadoDoLaco, nome: str, argumentos: Any, tool_use_id: str | None,
+    efeitos: list[str] | None = None, urls_aprovaveis: list[str] | None = None,
 ) -> tuple[str, bool]:
     """Stores `{token, tool, args}` in Redis, emits the `confirmacao` frame and returns
     to the model a NON-error "aguardando" (waiting) `tool_result`.
@@ -369,6 +514,10 @@ async def _ask_confirmation(
             # client sends in the confirmation POST.
             "args": argumentos if isinstance(argumentos, dict) else {},
             "criado_em": utc_now_naive().isoformat(),
+            # Why the click was asked: the replay shows the same card.
+            "efeitos": list(efeitos or []),
+            # What the click approves for this person (see `aprovar_urls`).
+            "urls_aprovaveis": list(urls_aprovaveis or []),
         },
         ensure_ascii=False,
     )
@@ -385,7 +534,7 @@ async def _ask_confirmation(
             {
                 "tool_use_id": tool_use_id,
                 "token": token,
-                "acao": {"tool": nome, "argumentos": _summarize(argumentos), "alvo": _target(argumentos)},
+                "acao": _card_action(nome, argumentos, efeitos),
             },
         )
     )
@@ -404,9 +553,10 @@ async def _home_gate(
         # `permitida` already filters the list the model sees; refusing here too keeps
         # the response uniform and is the same `list_tools`/`call_tool` separation as MCP.
         return (OUT_OF_REACH_MESSAGE, True)
-    if not await _confirmavel(estado, nome, argumentos):
+    pede, efeitos, urls = await _confirmavel(estado, nome, argumentos)
+    if not pede:
         return None
-    return await _ask_confirmation(estado, nome, argumentos, tool_use_id)
+    return await _ask_confirmation(estado, nome, argumentos, tool_use_id, efeitos, urls)
 
 
 # ── The frames the Home emits after a tool ───────────────────────────────────
@@ -555,7 +705,12 @@ O QUE EXIGE O CLIQUE DA PESSOA
 Mexer no que já existia pede um clique de confirmação, verificado no servidor:
 editar ou rodar um fluxo que a PESSOA criou, criar/alterar/apagar agendamento,
 apagar arquivo do Drive, restaurar versão, ligar/desligar um fluxo, publicar no
-portal, reexecutar. Ao chamar uma dessas, o servidor devolve "aguardando a
+portal, reexecutar. Também pedem o clique, mesmo num fluxo SEU, criar, alterar ou
+rodar um fluxo com nós que agem fora (e-mail, webhook, requisição HTTP, gravar em
+banco/Drive/S3, publicar, subfluxo, gatilho agendado, credencial guardada, mapa de
+fundo por URL própria); rodar um fluxo que lê uma URL fora do catálogo (uma vez:
+depois de confirmada, ela fica aprovada para a pessoa); e sondar ou registrar uma
+URL que ainda não está no catálogo. Ao chamar uma dessas, o servidor devolve "aguardando a
 confirmação da pessoa pelo botão": quando isso acontecer, diga em UMA LINHA o que
 está pendente e ENCERRE o turno. Nunca repita a chamada, e nunca peça a
 confirmação por texto — o botão já está na tela.

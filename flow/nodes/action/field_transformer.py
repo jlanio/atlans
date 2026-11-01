@@ -96,7 +96,11 @@ class SetFields(BaseNode):
     # on a pool thread, not on the event loop serving the executor's WebSocket.
     def execute_sync(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.validate()
-        gdf = self.get_first_gdf(inputs)
+        # A shallow copy: the column assignments below would otherwise land on
+        # the upstream node's own frame, which other branches (and `$Alias`
+        # references) read too. Only the column index is copied; `df[col] = v`
+        # replaces the column in the copy without touching the shared arrays.
+        gdf = self.get_first_gdf(inputs).copy(deep=False)
 
         # Context available in Jinja expressions — only safe vars
         jinja_context: dict = {"env": safe_env()}

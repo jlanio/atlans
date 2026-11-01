@@ -16,7 +16,7 @@ import asyncio
 import copy
 import json
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
@@ -36,8 +36,18 @@ from ._mcp_harness import FakeRedis, fake_scope
 pytestmark = pytest.mark.asyncio
 
 
-# ── Doubles ───────────────────────────────────────────────────────────────────
+# The editor refuses `run_workflow` for a workflow that acts outside, reading
+# it from the database. These tests are about the loop, not that rule (which
+# has its own tests below): the saved workflow only reads and transforms.
+_EDITOR_RUN_ACTS = cs._editor_run_acts
 
+
+@pytest.fixture(autouse=True)
+def _saved_workflow_does_not_act(monkeypatch):
+    monkeypatch.setattr(cs, "_editor_run_acts", AsyncMock(return_value=[]))
+
+
+# ── Doubles ───────────────────────────────────────────────────────────────────
 
 def _usage(entrada=100, saida=50, cache_leitura=0, cache_escrita=0):
     """The `uso` as the OpenRouter client returns it: in the project's keys, with
@@ -432,8 +442,9 @@ async def test_running_before_drafting_is_refused():
     assert fins[0].dados["erro"] is True
 
 
-async def test_after_drafting_the_run_goes_through():
-    """The refusal is about ORDER, not scope: once drawn, it can run."""
+async def test_after_drafting_the_run_goes_through(monkeypatch):
+    """The refusal is about ORDER, not scope: once drawn, it can run — a
+    workflow that only reads and transforms (no node acting outside)."""
     servidor = FakeServer(tools=[_FakeTool("run_workflow")])
     cliente = FakeClient(
         [
@@ -449,6 +460,61 @@ async def test_after_drafting_the_run_goes_through():
     await _collect(_converse(servidor=servidor, cliente=cliente))
 
     assert "run_workflow" in [nome for nome, _ in servidor.chamadas]
+
+
+@pytest.mark.parametrize("agem", [["SendEmail (n3)"], None])
+async def test_the_editor_does_not_run_a_workflow_that_acts_outside(monkeypatch, agem):
+    """Drawn or not, a workflow with nodes acting outside (e-mail, webhook,
+    writes, a stored credential) is run by the person with the editor's
+    button — the editor has no confirmation card. `None` = the workflow could
+    not be read: refused too (fail closed)."""
+    monkeypatch.setattr(cs, "_editor_run_acts", AsyncMock(return_value=agem))
+    servidor = FakeServer(tools=[_FakeTool("run_workflow")])
+    cliente = FakeClient(
+        [
+            ([], _response(
+                conteudo=[_tool_call(cs.NOME_DO_DESENHO, {"definition": {"nodes": [], "edges": []}})],
+                parada="tool_calls",
+            )),
+            ([], _response(conteudo=[_tool_call("run_workflow", {"workflow_id": "w1"})], parada="tool_calls")),
+            ([], _response(conteudo=[_as_text("ok")])),
+        ]
+    )
+
+    eventos = await _collect(_converse(servidor=servidor, cliente=cliente))
+
+    assert "run_workflow" not in [nome for nome, _ in servidor.chamadas]
+    fins = [e for e in eventos if e.tipo == "ferramenta_fim" and e.dados["nome"] == "run_workflow"]
+    assert fins and fins[0].dados["erro"] is True
+
+
+async def test_the_editor_reads_the_acting_nodes_of_the_saved_workflow(monkeypatch):
+    """`_editor_run_acts` reads the STORED definition, inside the session."""
+    from contextlib import asynccontextmanager
+    from types import SimpleNamespace
+
+    from app.mcp import infra
+    import app.mcp.resolucao as resolucao
+
+    @asynccontextmanager
+    async def _sessao():
+        yield object()
+
+    definicao = {"nodes": [
+        {"id": "n1", "name": "WFS", "type": "datasource", "properties": {}},
+        {"id": "n2", "name": "SendWebhook", "type": "output", "properties": {}},
+        {"id": "n3", "name": "DataOutput", "type": "output", "properties": {}},
+    ]}
+
+    async def _carregar(db, escopo, ref, **kw):
+        return SimpleNamespace(definition=definicao), "editor"
+
+    monkeypatch.setattr(infra, "sessao", _sessao)
+    monkeypatch.setattr(resolucao, "carregar_workflow", _carregar)
+    estado = SimpleNamespace(escopo=SimpleNamespace(user_id="u"))
+
+    assert await _EDITOR_RUN_ACTS(estado, {"workflow_id": "w1"}) == ["SendWebhook (n2)"]
+    assert await _EDITOR_RUN_ACTS(estado, {}) is None
 
 
 async def test_the_previous_turns_draft_counts_on_resume():

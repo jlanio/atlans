@@ -94,21 +94,19 @@ class RemoveDuplicates(BaseNode):
 
         original_count = len(gdf)
 
-        # Runs drop_duplicates in a thread (blocking operation)
-        # Doesn't use ignore_index, to preserve the original indexes and be able
-        # to identify removed records by index comparison.
-        if subset:
-            deduped = await asyncio.to_thread(
-                lambda: gdf.drop_duplicates(subset=subset, keep=keep)
-            )
-        else:
-            non_geo_cols = [c for c in gdf.columns if c != geo_col]
-            deduped = await asyncio.to_thread(
-                lambda: gdf.drop_duplicates(subset=non_geo_cols or None, keep=keep)
-            )
-
+        # Runs in a thread (blocking operation). A POSITIONAL mask, not a
+        # comparison by index label: with a non-unique index (the output of a
+        # spatial join, a concatenation) `index.isin(...)` matched every row
+        # sharing a label with a kept one, and `removed` came out empty while
+        # rows had been dropped. `duplicated` marks exactly what
+        # `drop_duplicates` drops, with the same `keep`.
+        colunas = subset if subset else ([c for c in gdf.columns if c != geo_col] or None)
+        duplicada = await asyncio.to_thread(
+            lambda: gdf.duplicated(subset=colunas, keep=keep).to_numpy()
+        )
+        deduped = gdf[~duplicada]
         removed_count = original_count - len(deduped)
-        removed_gdf = gdf[~gdf.index.isin(deduped.index)] if removed_count > 0 else gdf.iloc[0:0]
+        removed_gdf = gdf[duplicada] if removed_count > 0 else gdf.iloc[0:0]
         deduped = deduped.reset_index(drop=True)
 
         logger.info(

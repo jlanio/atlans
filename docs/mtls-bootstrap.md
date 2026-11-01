@@ -233,10 +233,11 @@ executor needs a new OTP + enroll.
 > (name without the time, no automatic retention) — run it via a daily cron:
 
 ```bash
-docker run --rm \
-    -v step-ca-data:/data \
-    -v "$(pwd)/backups:/backup" \
-    alpine tar czf /backup/step-ca-$(date +%F).tar.gz -C /data .
+# The archive holds the CA's keys and their password: directory 0700, file 0600,
+# written by your shell (not by the container's root).
+( umask 077 && mkdir -p backups && chmod 700 backups && \
+  docker run --rm -v step-ca-data:/data:ro alpine tar czf - -C /data . \
+      > "backups/step-ca-$(date +%F).tar.gz" )
 ```
 
 Keep the tarballs off the host (S3 with KMS, etc.).

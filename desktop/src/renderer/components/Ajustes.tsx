@@ -351,6 +351,7 @@ export const Ajustes = memo(function Ajustes({
   const [original, setOriginal] = useState<RunConfig | null>(null)
   const [autostart, setAutostart] = useState<AutostartState | null>(null)
   const [salvo, setSaved] = useState(false)
+  const [erroSalvar, setSaveError] = useState<string | null>(null)
 
   const carregar = useCallback(() => {
     void window.atlas.execucao().then((c) => { setCfg(c); setOriginal(c) })
@@ -372,7 +373,7 @@ export const Ajustes = memo(function Ajustes({
 
   if (!cfg || !original) return <p className="text-sm text-muted-foreground">Carregando…</p>
 
-  const patch = (p: Partial<RunConfig>) => { setCfg({ ...cfg, ...p }); setSaved(false) }
+  const patch = (p: Partial<RunConfig>) => { setCfg({ ...cfg, ...p }); setSaved(false); setSaveError(null) }
   const valido =
     withinRange(cfg.workers, LIMITES.workers) &&
     withinRange(cfg.filaMax, LIMITES.filaMax) &&
@@ -380,9 +381,12 @@ export const Ajustes = memo(function Ajustes({
     cfg.artifactsDir.trim().length > 0
 
   async function salvar() {
-    const atual = await window.atlas.salvarExecucao(cfg!)
-    setCfg(atual)
-    setOriginal(atual)
+    const r = await window.atlas.salvarExecucao(cfg!)
+    // Refused: nothing was written. The edits stay on screen to be fixed.
+    if (!r.salvo) { setSaveError(r.erro ?? 'Não foi possível salvar.'); return }
+    setSaveError(null)
+    setCfg(r.config)
+    setOriginal(r.config)
     setSaved(true)
   }
 
@@ -528,9 +532,10 @@ export const Ajustes = memo(function Ajustes({
       <BarraSalvar
         mudou={sujo} salvo={salvo}
         invalido={!valido}
+        erro={erroSalvar}
         rodando={rodando}
         aoSalvar={salvar}
-        aoDescartar={() => { setCfg(original); setSaved(false) }}
+        aoDescartar={() => { setCfg(original); setSaved(false); setSaveError(null) }}
       />
     </div>
   )

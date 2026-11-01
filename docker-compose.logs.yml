@@ -1,0 +1,143 @@
+# The log of api-prod and web-prod, by LOG_DRIVER (.env): docker-compose.yml
+# takes the block `<api|web>-${LOG_DRIVER:-json-file}` from here (`extends`).
+# Not a project of its own — no image, nothing to bring up.
+#
+# The options live apart per driver because each driver rejects the others':
+# json-file needs max-size/max-file (without them it grows until the disk
+# fills), and journald refuses both ("unknown log opt").
+#
+#   json-file  any host (the default). Rotated: LOG_MAX_SIZE x LOG_MAX_FILE
+#              per container, 10m x 5. Deleted along with the container — and
+#              every deploy recreates these two.
+#   journald   a host with systemd: the log stays on the host across deploys,
+#              under journald's own ceiling (SystemMaxUse); `journalctl -t
+#              atlans-api`. See docs/operations.md, "Logs that survive the deploy".
+#
+#   local      json-file's successor (compressed, rotated): no `tag`.
+#   syslog, gelf, fluentd, awslogs, splunk
+#              shipping to a collector: only the tag goes, as before; the
+#              collector's address comes from the driver's own options
+#              (daemon.json or an edit here).
+#
+# Another driver: add `api-<driver>` and `web-<driver>` blocks here.
+#
+# The OTHER services (Traefik, Redis, MinIO, step-ca, Postgres…) take
+# `servicos-${LOG_SERVICOS:-rotacionado}`: json-file rotated at
+# LOG_MAX_SIZE x LOG_MAX_FILE, or `LOG_SERVICOS=daemon` to keep the daemon's
+# own driver (daemon.json) — for hosts that ship every container's log to
+# journald, Loki or a SIEM. With `daemon` the ceiling is the daemon's.
+
+services:
+  api-json-file:
+    logging:
+      driver: json-file
+      options:
+        tag: atlans-api
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: ${LOG_MAX_FILE:-5}
+
+  web-json-file:
+    logging:
+      driver: json-file
+      options:
+        tag: atlans-web
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: ${LOG_MAX_FILE:-5}
+
+  api-journald:
+    logging:
+      driver: journald
+      options:
+        tag: atlans-api
+
+  web-journald:
+    logging:
+      driver: journald
+      options:
+        tag: atlans-web
+
+  api-local:
+    logging:
+      driver: local
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: ${LOG_MAX_FILE:-5}
+
+  web-local:
+    logging:
+      driver: local
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: ${LOG_MAX_FILE:-5}
+
+  api-syslog:
+    logging:
+      driver: syslog
+      options:
+        tag: atlans-api
+
+  web-syslog:
+    logging:
+      driver: syslog
+      options:
+        tag: atlans-web
+
+  api-gelf:
+    logging:
+      driver: gelf
+      options:
+        tag: atlans-api
+
+  web-gelf:
+    logging:
+      driver: gelf
+      options:
+        tag: atlans-web
+
+  api-fluentd:
+    logging:
+      driver: fluentd
+      options:
+        tag: atlans-api
+
+  web-fluentd:
+    logging:
+      driver: fluentd
+      options:
+        tag: atlans-web
+
+  api-awslogs:
+    logging:
+      driver: awslogs
+      options:
+        tag: atlans-api
+
+  web-awslogs:
+    logging:
+      driver: awslogs
+      options:
+        tag: atlans-web
+
+  api-splunk:
+    logging:
+      driver: splunk
+      options:
+        tag: atlans-api
+
+  web-splunk:
+    logging:
+      driver: splunk
+      options:
+        tag: atlans-web
+
+  servicos-rotacionado:
+    logging:
+      driver: json-file
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: ${LOG_MAX_FILE:-5}
+
+  # No `logging`: the daemon's driver and options (daemon.json) apply.
+  servicos-daemon:
+    labels:
+      atlans.logs: daemon

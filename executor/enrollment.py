@@ -160,6 +160,46 @@ def _private_pem(chave: Ed25519PrivateKey | X25519PrivateKey) -> bytes:
     )
 
 
+# ── Interrupted renewal (see executor/renewal.py) ─────────────────────────────
+# The key and CSR of a renewal in progress, kept until its bundle is persisted.
+# Lives here because this module is the single place that writes credentials.
+
+RENEWAL_PENDING_FILE = "renovacao_pendente.json"
+
+
+def save_pending_renewal(cert_dir: Path, key: Ed25519PrivateKey, csr_pem: str, criado_em: float) -> None:
+    """Writes the pending renewal (0600, atomic swap)."""
+    destino = Path(cert_dir) / RENEWAL_PENDING_FILE
+    temporario = destino.with_name(destino.name + ".new")
+    conteudo = json.dumps({
+        "key_pem": _private_pem(key).decode(),
+        "csr_pem": csr_pem,
+        "criado_em": criado_em,
+    }).encode()
+    _write_pem(temporario, conteudo)
+    os.replace(temporario, destino)
+
+
+def load_pending_renewal(cert_dir: Path) -> "dict | None":
+    """The stored pending renewal, or None (absent). Raises on a corrupt file."""
+    caminho = Path(cert_dir) / RENEWAL_PENDING_FILE
+    try:
+        dados = json.loads(caminho.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    chave = serialization.load_pem_private_key(dados["key_pem"].encode(), password=None)
+    if not isinstance(chave, Ed25519PrivateKey):
+        raise ValueError("chave pendente nao e Ed25519")
+    return {"key": chave, "csr_pem": str(dados["csr_pem"]), "criado_em": float(dados["criado_em"])}
+
+
+def drop_pending_renewal(cert_dir: Path) -> None:
+    try:
+        (Path(cert_dir) / RENEWAL_PENDING_FILE).unlink()
+    except FileNotFoundError:
+        pass
+
+
 def _validate_bundle(bundle: dict, new_key: Ed25519PrivateKey) -> str | None:
     """
     Validates the bundle returned by /enroll or /renew-cert BEFORE touching any

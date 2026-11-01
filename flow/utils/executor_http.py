@@ -30,10 +30,19 @@ def is_local_server(url: str) -> bool:
     query string — as local, turning off TLS and mTLS entirely
     (`verify=False` / `ssl_ctx=None`). Single implementation: the executor
     re-exports it from `executor.utils`.
+
+    The SCHEME counts too: only a plaintext URL (ws:// or http://) to a
+    local name goes without TLS. `wss://host.docker.internal` — the natural
+    address for "the server on the Docker host", a name the production
+    compose file makes routable — used to switch off certificate checks and
+    the client certificate while still asking for TLS.
     """
     try:
-        host = urlparse(url).hostname
+        partes = urlparse(url)
+        host = partes.hostname
     except ValueError:
+        return False
+    if (partes.scheme or "").lower() not in ("ws", "http"):
         return False
     return (host or "").lower() in _LOCAL_HOSTS
 

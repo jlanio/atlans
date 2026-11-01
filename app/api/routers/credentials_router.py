@@ -148,27 +148,83 @@ async def _test_connectivity(cred_type: str, data: dict) -> dict:
     return {"ok": True, "message": "Campos validados com sucesso."}
 
 
+_ENDERECOS_NO_TESTE = 3
+_PRAZO_DO_TESTE_S = 9
+
+
 async def _test_db_connection(cred_type: str, data: dict) -> dict:
-    from app.core.credentials.connection_builder import build_connection_data
+    from app.core.credentials.connection_builder import build_connection_data, porta_valida
     import asyncio
+
+    # SSRF: the test connects FROM THE API host, inside the platform's network
+    # (its own Postgres, Redis, MinIO). Without this check, any signed-in user
+    # could probe internal hosts and ports and guess passwords through the three
+    # distinct answers. Same rule as the S3 test below. The resolved address is
+    # the one connected to (no second resolution in between).
+    host = str(data.get("host") or "localhost").strip()
+    padrao = 5432 if cred_type == "postgresql" else 3306
+    porta = porta_valida(data.get("port")) if str(data.get("port") or "").strip() else padrao
+    if porta is None:
+        return {"ok": False, "message": "Porta inválida: use um número de 1 a 65535."}
+    from flow.utils.geo_helpers import validated_addresses
+    nome = host[1:-1] if host.startswith("[") and host.endswith("]") else host
+    try:
+        ips = await asyncio.to_thread(validated_addresses, nome)
+    except ValueError as exc:
+        return {
+            "ok": False,
+            "message": (
+                f"Endereço bloqueado no teste pelo servidor: {exc} O teste não alcança "
+                "redes internas; a conexão real é feita pelo executor."
+            ),
+        }
+
+    # At most 3 addresses, each with its share of the answer's 10 s: a name
+    # resolving to 20 addresses held a worker thread (the pool login's bcrypt
+    # also uses) for ~100 s after the answer was already sent.
+    ips = ips[:_ENDERECOS_NO_TESTE]
+    por_tentativa = max(1, _PRAZO_DO_TESTE_S // len(ips))
 
     built = build_connection_data(cred_type, data)
     conn_str = built.get("connectionString", "")
+    tentativas: list[tuple[str, dict]] = []
+    if cred_type == "postgresql":
+        # libpq connects to `hostaddr` and keeps `host` for TLS verification. With
+        # a LIST of both (same length), it falls back from one address to the
+        # next, as it would on its own after resolving the name.
+        tentativas.append((conn_str, {
+            # libpq applies connect_timeout PER address of the list.
+            "connect_timeout": por_tentativa,
+            "host": ",".join([nome] * len(ips)),
+            "hostaddr": ",".join(ips),
+        }))
+    else:
+        # The MySQL driver takes one address: try them in order, as libpq does.
+        from urllib.parse import quote_plus
+        for ip in ips:
+            ip_na_url = f"[{ip}]" if ":" in ip else ip
+            tentativas.append((
+                conn_str.replace(f"@{quote_plus(host)}:", f"@{ip_na_url}:", 1),
+                {"connect_timeout": por_tentativa},
+            ))
 
     def _try_connect():
-        try:
-            import sqlalchemy
-            engine = sqlalchemy.create_engine(conn_str, connect_args={"connect_timeout": 5})
-            with engine.connect() as conn:
-                conn.execute(sqlalchemy.text("SELECT 1"))
-            engine.dispose()
-            return {"ok": True, "message": "Conexão estabelecida com sucesso!"}
-        except Exception as exc:
-            logger.warning("Falha no teste de conexão DB: %s", exc)
-            return {"ok": False, "message": "Falha na conexão com o banco de dados. Verifique as credenciais e o endereço do servidor."}
+        import sqlalchemy
+        for url, connect_args in tentativas:
+            try:
+                engine = sqlalchemy.create_engine(url, connect_args=connect_args)
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(sqlalchemy.text("SELECT 1"))
+                finally:
+                    engine.dispose()
+                return {"ok": True, "message": "Conexão estabelecida com sucesso!"}
+            except Exception as exc:
+                logger.warning("Falha no teste de conexão DB: %s", exc)
+        return {"ok": False, "message": "Falha na conexão com o banco de dados. Verifique as credenciais e o endereço do servidor."}
 
     try:
-        return await asyncio.wait_for(asyncio.to_thread(_try_connect), timeout=10)
+        return await asyncio.wait_for(asyncio.to_thread(_try_connect), timeout=_PRAZO_DO_TESTE_S + 1)
     except asyncio.TimeoutError:
         return {"ok": False, "message": "Tempo limite excedido ao tentar conectar (10s)."}
     except Exception as exc:

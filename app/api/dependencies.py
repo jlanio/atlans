@@ -51,7 +51,9 @@ async def validate_access_token_claims(token: str) -> dict | None:
     base (the blacklist check has diverged between the paths in the past)."""
     # Local import (not the top-level one) so that tests patching
     # app.core.utils.jwt_utils.decode_token reach this call.
-    from app.core.utils.jwt_utils import AUDIENCE_ACCESS, decode_token, is_token_blacklisted
+    from app.core.utils.jwt_utils import (
+        AUDIENCE_ACCESS, decode_token, is_token_blacklisted, session_revoked,
+    )
     try:
         claims = decode_token(token, expected_audience=AUDIENCE_ACCESS)
         if claims.get("type") != "access":
@@ -59,6 +61,9 @@ async def validate_access_token_claims(token: str) -> dict | None:
     except (_jwt.PyJWTError, ValueError):
         return None
     if await is_token_blacklisted(token):
+        return None
+    # A password reset ends every session opened before it (jwt_utils).
+    if await session_revoked(claims):
         return None
     return claims
 
@@ -372,9 +377,11 @@ def assert_request_from_trusted_proxy(client_host: str | None, path: str) -> Non
     (layer 1 is the `strip-executor-cert-header@file` middleware in Traefik).
     Needed because Traefik's `passTLSClientCert` only overwrites the
     header when there is a client cert — it never removes a header already present.
+    The peer has to be in MTLS_PROXIES (Traefik alone, in the compose file), not
+    merely in TRUSTED_PROXIES: the web container is there too, for the XFF.
     """
-    from app.core.trusted_proxy import is_trusted_proxy
-    if is_trusted_proxy(client_host):
+    from app.core.trusted_proxy import is_mtls_proxy
+    if is_mtls_proxy(client_host):
         return
     from app.core.utils.logger import get_logger as _gl
     _gl("app.api.dependencies.mtls").warning(
@@ -492,6 +499,47 @@ async def get_agent_from_mtls(
                     "Cert mTLS ausente/invalido em %s %s | header_present=%s",
                     request.method, request.url.path, bool(header_value),
                 )
+        raise HTTPException(status_code=_MTLS_HTTP_STATUS.get(exc.reason, 401), detail=exc.detail)
+
+
+class RenovacaoRepetida:
+    """An executor presenting the serial it just renewed AWAY from.
+
+    Only `/executores/renew-cert` accepts it, and only to hand back the bundle
+    of that same renewal when the request repeats it exactly (same CSR, within
+    the replay window): the answer of a renewal can be lost after the server
+    already swapped the serial. Anything else is refused as before.
+    """
+
+    __slots__ = ("executor_id", "serial")
+
+    def __init__(self, executor_id: str, serial: str):
+        self.executor_id = executor_id
+        self.serial = serial
+
+
+async def get_agent_from_mtls_or_renewal_replay(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """`get_agent_from_mtls`, except that an active executor whose ONLY problem
+    is a serial that no longer matches (or was revoked by a renewal) comes back
+    as `RenovacaoRepetida` for the renewal route to check against its replay."""
+    header_value = request.headers.get("X-Forwarded-Tls-Client-Cert-Info", "")
+    try:
+        return await validate_executor_mtls(
+            header_value=header_value,
+            client_host=request.client.host if request.client else None,
+            url_path=request.url.path,
+            db=db,
+        )
+    except ExecutorMtlsError as exc:
+        if exc.reason in ("serial_mismatch", "revoked"):
+            # validate_executor_mtls already checked the trusted proxy, the CN
+            # and that the executor exists and is active before the serial.
+            cn, serial = _parse_traefik_client_cert(header_value)
+            if cn and serial:
+                return RenovacaoRepetida(cn.removeprefix("executor-"), serial)
         raise HTTPException(status_code=_MTLS_HTTP_STATUS.get(exc.reason, 401), detail=exc.detail)
 
 

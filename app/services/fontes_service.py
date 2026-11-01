@@ -638,6 +638,25 @@ async def obter(db: AsyncSession, source_id: str, workspace_ids: Iterable[str] |
     return linha.scalar_one_or_none()
 
 
+async def url_no_catalogo(db: AsyncSession, escopo: Any, url: Any) -> bool:
+    """Is this endpoint already a cataloged source within the caller's reach?
+
+    The URL is compared normalized, the way the catalog stores it. A URL that
+    could never be a source answers False (the tool refuses it right after)."""
+    try:
+        endereco = normalize_url(url)
+    except InvalidSourceError:
+        return False
+    resultado = await db.execute(
+        select(func.count()).select_from(DataSource).where(
+            DataSource.url == endereco,
+            DataSource.deleted_at.is_(None),
+            _in_scope(getattr(escopo, "workspace_ids", None)),
+        )
+    )
+    return int(resultado.scalar_one()) > 0
+
+
 async def get_by_key(db: AsyncSession, chave: str) -> DataSource | None:
     linha = await db.execute(select(DataSource).where(DataSource.chave == chave))
     return linha.scalar_one_or_none()

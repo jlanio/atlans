@@ -152,3 +152,22 @@ async def test_patch_splits_the_pasted_line():
             domains=["hooks.slack.com; api.exemplo.com"], db=MagicMock(),
         )
     assert saida == {"webhook_whitelist": ["hooks.slack.com", "api.exemplo.com"]}
+
+
+async def test_the_completion_webhook_goes_out_once_per_run(monkeypatch):
+    """A result delivered twice (resend after a dropped socket, dead-letter
+    reprocess, the reliable queue handing an item back) posted twice."""
+    vistos = set()
+
+    class _Redis:
+        async def set(self, chave, _valor, nx=False, ex=None):
+            if nx and chave in vistos:
+                return None
+            vistos.add(chave)
+            return True
+
+    monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: _Redis())
+    primeira = await _disparar("https://hooks.slack.com/services/x", [])
+    segunda = await _disparar("https://hooks.slack.com/services/x", [])
+    primeira.assert_called_once()
+    segunda.assert_not_called()

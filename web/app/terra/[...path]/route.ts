@@ -72,7 +72,15 @@ function csrfBlocked(req: NextRequest): boolean {
   if (secFetchSite === "cross-site") return true
   // Modern browsers assert same-origin: trust it and avoid comparing Host
   // (which a proxy may rewrite), while still blocking cross-site above.
-  if (secFetchSite === "same-origin" || secFetchSite === "same-site") return false
+  // `none` is a request the user started (address bar, bookmark): no other
+  // page made it.
+  //
+  // `same-site` is NOT trusted outright: it is a sibling subdomain (or the other
+  // scheme) — another origin, and precisely the one case SameSite=Lax does not
+  // cover, since the browser sends the session cookie along. A page on any
+  // subdomain of the site could post here as the user. It falls through to the
+  // Origin comparison like a request without the header.
+  if (secFetchSite === "same-origin" || secFetchSite === "none") return false
   const origin = req.headers.get("origin")
   if (origin) {
     try {
@@ -105,15 +113,34 @@ async function proxy(
     PUBLIC_SUFFIXES.some((s) => pathStr.endsWith(s))
 
   // CSRF on state-changing methods, outside the public paths (auth/ has
-  // NextAuth's own CSRF; the portal is read-only).
+  // NextAuth's own CSRF; the portal is read-only) — unless the session
+  // authenticates the public request, below.
   const changesState = req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS"
   if (changesState && !isPublic && csrfBlocked(req)) {
     return NextResponse.json({ detail: "Origem não permitida" }, { status: 403 })
   }
 
-  // Access token the upstream is authenticated with (only on protected paths).
+  // Access token the upstream is authenticated with.
   let accessToken: string | null = null
-  if (!isPublic) {
+  if (isPublic) {
+    // Public paths do not REQUIRE a session, but several are used logged in:
+    // `auth/*` (API tokens, me, logout) and `*/download` (Drive, artifacts).
+    // Forwarding the client's Bearer there broke them in a tab that kept focus
+    // past the access TTL — the browser's copy is only refreshed when
+    // useSession refetches — while the middleware's copy is always fresh. So
+    // the server's session wins when there is one, and the client's header is
+    // only the fallback for a visitor without a session. Header only, no
+    // `auth()`: the anonymous portal (tiles!) must not pay for a session lookup.
+    accessToken = decodeSessionHeader(req.headers.get(SESSION_HEADER))?.user?.access_token ?? null
+    // From here the session COOKIE authenticates this request, which a page
+    // can make the browser send without being able to set a header — the same
+    // exposure as a protected path, so the same check (creating or revoking an
+    // API token, for one). Without a session it stays exempt: nothing of the
+    // user's goes along.
+    if (accessToken && changesState && csrfBlocked(req)) {
+      return NextResponse.json({ detail: "Origem não permitida" }, { status: 403 })
+    }
+  } else {
     // The session comes from the middleware via SESSION_HEADER — already RENEWED and
     // with the rotated cookie PERSISTED there. `await auth()` is only a safety net
     // for the rare case of the header missing (middleware did not run); on the
@@ -143,7 +170,8 @@ async function proxy(
   // middleware), and not with the client's Authorization — which, in a long
   // polling-only session, goes stale until useSession refreshes it, producing a
   // 401 in the backend even without a logout.
-  // On public paths the client's Bearer (when present) passes through intact.
+  // On a public path without a session the client's Bearer (when present)
+  // passes through intact.
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`)
 
   // A small body (known content-length, ≤32MB) is BUFFERED; the rest

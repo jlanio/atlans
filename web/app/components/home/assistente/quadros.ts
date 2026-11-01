@@ -144,7 +144,9 @@ export interface AssistantLayer {
 export interface AssistantConfirmation {
   tool_use_id: string
   token: string
-  acao: { tool: string; argumentos: Record<string, unknown>; alvo?: string }
+  /** `efeitos`: the nodes that act outside the platform — why the click is asked
+   *  for a workflow the assistant itself wrote. */
+  acao: { tool: string; argumentos: Record<string, unknown>; alvo?: string; efeitos?: string[] }
 }
 
 export type AssistantBlock =
@@ -415,6 +417,9 @@ function confirmationFrom(dados: Record<string, unknown>): AssistantConfirmation
       tool: String(acao.tool ?? ""),
       argumentos: objeto(acao.argumentos),
       alvo: typeof acao.alvo === "string" ? acao.alvo : undefined,
+      efeitos: Array.isArray(acao.efeitos)
+        ? acao.efeitos.filter((e): e is string => typeof e === "string" && e.length > 0)
+        : undefined,
     },
   }
 }

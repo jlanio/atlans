@@ -59,13 +59,24 @@ def _parse_url(url: str) -> tuple[str, dict]:
     #   verify-ca             → verifies the chain (CA from DATABASE_CA_CERT)
     #   verify-full           → verifies chain + hostname
     import os as _os
-    _ssl_ctx = ssl.create_default_context()
     ca_cert = _os.getenv("DATABASE_CA_CERT", "").strip()
-    if ca_cert and _os.path.isfile(ca_cert):
-        try:
-            _ssl_ctx.load_verify_locations(cafile=ca_cert)
-        except OSError as e:
-            logger.warning("DATABASE_CA_CERT não pôde ser carregado (%s): %s", ca_cert, e)
+    if ssl_value == "verify-ca" and ca_cert and _os.path.isfile(ca_cert):
+        # verify-ca checks the chain WITHOUT the host name: with the public
+        # roots also trusted, any publicly issued certificate would pass. The
+        # private CA ALONE.
+        _ssl_ctx = ssl.create_default_context(cafile=ca_cert)
+    else:
+        _ssl_ctx = ssl.create_default_context()
+        if ca_cert and _os.path.isfile(ca_cert):
+            try:
+                _ssl_ctx.load_verify_locations(cafile=ca_cert)
+            except OSError as e:
+                logger.warning("DATABASE_CA_CERT não pôde ser carregado (%s): %s", ca_cert, e)
+        elif ssl_value == "verify-ca":
+            logger.warning(
+                "ssl=verify-ca sem DATABASE_CA_CERT valido: a cadeia e conferida contra "
+                "as raizes publicas SEM o nome do host. Defina DATABASE_CA_CERT (ou use verify-full)."
+            )
 
     if ssl_value == "verify-full":
         _ssl_ctx.check_hostname = True
@@ -106,8 +117,27 @@ def _timeouts(statement_timeout_s: int, command_timeout_s: int) -> dict:
     return args
 
 
+def _utc_session(connect_args: dict) -> dict:
+    """connect_args with the session's time zone pinned to UTC.
+
+    The `TIMESTAMP` (without time zone) columns are written both by Postgres'
+    `now()` (server_default, e.g. artifacts.created_at, workspace_files.created_at)
+    and by the app's `utc_now_naive()`, and compared with cut-offs computed in UTC
+    (app/core/storage_reconciliation.py). `now()` becomes a `timestamp` in the
+    SESSION's time zone, which by default is the server's (`timezone` in
+    postgresql.conf): on a server in America/Cuiaba, created_at came out 4 h
+    behind every UTC cut-off. Pinned per connection, it no longer depends on how
+    the server was installed. `timestamptz` values are unaffected (asyncpg reads
+    and writes them as instants).
+    """
+    return {
+        **connect_args,
+        "server_settings": {**connect_args.get("server_settings", {}), "timezone": "UTC"},
+    }
+
+
 _async_url, _connect_args = _parse_url(DATABASE_URL) if DATABASE_URL else (None, {})
-_connect_args = {**_connect_args, **_timeouts(DB_STATEMENT_TIMEOUT, DB_COMMAND_TIMEOUT)}
+_connect_args = _utc_session({**_connect_args, **_timeouts(DB_STATEMENT_TIMEOUT, DB_COMMAND_TIMEOUT)})
 
 # --- Async Engine & Session ---
 #

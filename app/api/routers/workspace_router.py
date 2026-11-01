@@ -224,7 +224,7 @@ async def delete_workspace(
     #
     # It is here that the transaction above is committed, in the helper's internal commit.
     from app.services.storage_purge_service import schedule_workspace_data_expiry
-    scheduled = await schedule_workspace_data_expiry(db, id_hash)
+    scheduled = await schedule_workspace_data_expiry(db, id_hash, deleted_at=deleted_at)
 
     await db.commit()
     logger.info(
@@ -349,8 +349,17 @@ async def invite_member(
     if payload.role not in _VALID_ROLES:
         raise HTTPException(status_code=400, detail=f"Role inválido. Opções: {sorted(_VALID_ROLES)}")
 
-    # Look up the user by e-mail
-    result = await db.execute(select(User).where(User.email == payload.email))
+    # Look up the user by e-mail — case-insensitive and active only, like the
+    # search the invite form uses to find the person: `Alice@X.org` was "não
+    # encontrado" right after the search had found it, and a suspended or
+    # deleted account could be made a member.
+    from sqlalchemy import func as sa_func
+    result = await db.execute(
+        select(User).where(
+            sa_func.lower(User.email) == payload.email.strip().lower(),
+            User.status == "active",
+        )
+    )
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail=f"Usuário com e-mail '{payload.email}' não encontrado.")

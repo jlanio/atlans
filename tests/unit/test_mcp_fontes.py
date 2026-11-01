@@ -226,9 +226,11 @@ async def test_probe_does_not_trigger_the_discarded_search(banco, monkeypatch):
 async def test_probe_with_layer_describes_and_updates_the_cataloged_source(banco, monkeypatch):
     monkeypatch.setattr(fs, "sondar_wfs", AsyncMock(side_effect=lambda u, t=None, v="2.0.0": _probe(u, t, v)))
     saida = await probe_source(ctx(), FUNAI, type_name="Funai:tis_poligonais")
-    assert saida["outcome"] == "layer_described" and saida["layer"] == "Funai:tis_poligonais"
+    # The layer name is the remote server's text: inside untrusted_data, with the snippet.
+    assert saida["outcome"] == "layer_described" and "layer" not in saida and "node_snippet" not in saida
+    assert saida["untrusted_data"]["layer"] == "Funai:tis_poligonais"
     assert saida["schema"]["columns_source"] == "describe_feature_type" and saida["schema"]["bbox"] == [-73.99, -33.75, -28.84, 5.27]
-    assert saida["node_snippet"]["properties"] == {"url": FUNAI, "typeName": "Funai:tis_poligonais", "sortBy": "gid"}
+    assert saida["untrusted_data"]["node_snippet"]["properties"] == {"url": FUNAI, "typeName": "Funai:tis_poligonais", "sortBy": "gid"}
     assert saida["catalog"]["scope"] == "platform" and saida["catalog"]["state"] == "ok"
     assert saida["untrusted_data"]["title"] == "tis poligonais" and "hint" not in saida
     async with infra.sessao() as db:
@@ -343,3 +345,19 @@ async def test_register_does_not_store_when_the_probe_fails(banco, monkeypatch):
         await register_source(ctx(), "https://fora.do.ar/ows", "x:y")
     assert corpo(exc.value)["reason"] == "timeout"
     assert (await search_sources(ctx(), query="fora.do.ar"))["total"] == 0
+
+
+# ── url_no_catalogo: what the Home gate asks before a probe goes out ─────────
+
+
+async def test_url_in_the_catalog_is_compared_normalized_and_within_reach(banco):
+    escopo = fake_scope(user_id="usr-1", workspace_ids={WS_1})
+    async with infra.sessao() as db:
+        # Platform source, with the query the person pasted: same endpoint.
+        assert await fs.url_no_catalogo(db, escopo, FUNAI + "?service=WFS&request=GetCapabilities") is True
+        # Workspace 1 source, within reach.
+        assert await fs.url_no_catalogo(db, escopo, "https://geoserver.exemplo.gov.br/ows/") is True
+        # Unknown endpoint, and what could never be a source.
+        assert await fs.url_no_catalogo(db, escopo, "https://outro.exemplo.net/wfs") is False
+        assert await fs.url_no_catalogo(db, escopo, "ftp://x") is False
+        assert await fs.url_no_catalogo(db, escopo, None) is False

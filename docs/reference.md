@@ -67,7 +67,7 @@ Copy `.env.example` to `.env` and adjust the values. The main ones:
 | Variable | Description | Example |
 |---|---|---|
 | `API_INTERNA` | Internal API URL (Next.js server side) | `http://api:8000` |
-| `API_PORT` | API port visible to the browser (the compose passes it to the web app as `NEXT_PUBLIC_API_PORT`) | `8000` |
+| `API_PORT` | Dev only: the host port the API is published on (`127.0.0.1`) and the one the browser uses (the compose passes it to the web app as `NEXT_PUBLIC_API_PORT`). Inside Docker the API always listens on `8000`, which is what `API_INTERNA` and the production web app use | `8000` |
 | `NOME_NA_TELA` | The name the screen shows (sidebar, sign-in, tab); empty = `Atlans`. The form with the domain is the holder's trademark ([TRADEMARKS.md](../TRADEMARKS.md)) | `Minha Instalação` |
 | `AUTH_URL` | Public URL of the app (Auth.js redirect) | `https://app.exemplo.com` |
 

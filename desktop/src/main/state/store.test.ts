@@ -151,3 +151,22 @@ describe('canal incremental', () => {
     expect(JSON.stringify(estados[0])).not.toContain('nao devo viajar')
   })
 })
+
+describe('estado do supervisor', () => {
+  it.each(['restarting', 'starting'] as const)(
+    'em %s, fase e snapshot do processo anterior somem',
+    (estado) => {
+      // A leftover `fase: draining` kept the "Encerrando — Forçar agora" alert
+      // on screen through the restart backoff, for a process already gone.
+      store.aplicarEvento({
+        v: 1, t: 'state', ts: 1, data: { phase: 'draining', step: null, detail: null },
+      } as ExecutorEvent)
+      store.aplicarEvento({ v: 1, t: 'snapshot', ts: 1, data: { running_count: 1 } } as unknown as ExecutorEvent)
+      expect(store.instantaneo().fase).toBe('draining')
+
+      store.aplicarEstadoSupervisor(estado)
+      expect(store.instantaneo().fase).toBeNull()
+      expect(store.instantaneo().snapshot).toBeNull()
+    },
+  )
+})

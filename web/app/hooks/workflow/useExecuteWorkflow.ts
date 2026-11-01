@@ -1,5 +1,5 @@
 import { useParams } from "next/navigation"
-import { useSaveWorkflow } from "./useSaveWorkflow"
+import { useSaveWorkflow, type SaveSkipReason } from "./useSaveWorkflow"
 import { useEffect, useRef } from "react"
 import { useSession } from "next-auth/react"
 import { INodeContext, INodeStatusWorkFlow, StatusWorkflow } from "@/context/useFlowContext"
@@ -18,6 +18,25 @@ const WF_COMPLETE = "__workflow_complete__"
  *  With exponential backoff up to 15s, covers ~2 minutes of instability. */
 const MAX_RECONEXOES = 8
 
+/** Identity of an event across the replay and the panel (seconds, node, status, kind). */
+function chaveDoEvento(segundos: number | undefined, node?: string, status?: string, kind?: string): string {
+  return `${Math.round((segundos ?? 0) * 1000)}|${node ?? ""}|${status ?? ""}|${kind ?? ""}`
+}
+
+/** Does the access token (a JWT) expire within the next minute? Not a JWT → no. */
+function tokenVencendo(token: string | null): boolean {
+  if (!token) return false
+  const partes = token.split(".")
+  if (partes.length !== 3) return false
+  try {
+    const json = atob(partes[1].replace(/-/g, "+").replace(/_/g, "/"))
+    const exp = (JSON.parse(json) as { exp?: number }).exp
+    return typeof exp === "number" && exp * 1000 < Date.now() + 60_000
+  } catch {
+    return false
+  }
+}
+
 /** Maximum silence tolerated on the socket before assuming it dead and recovering.
  *
  *  The server sends a heartbeat (empty batch) every ~20s during the run, so a
@@ -35,6 +54,16 @@ const TERMINAL_OUTCOME: Record<string, StatusWorkflow> = {
   success:   "completed",
   failed:    "failed",
   cancelled: "cancelled",
+}
+
+/** What Executar tells the person when the save before the run wrote nothing.
+ *  The run does not go out: it would execute the stored definition while the
+ *  canvas shows another one. */
+const RUN_NOT_SAVED: Record<SaveSkipReason, [titulo: string, descricao?: string]> = {
+  in_flight:    ["Salvamento em andamento", "Execute de novo quando o workflow terminar de salvar."],
+  not_hydrated: ["Aguarde o workflow carregar para executar"],
+  needs_name:   ["Dê um nome ao workflow para executar"],
+  empty_graph:  ["Workflow não executado", "Não foi possível salvar o canvas antes de executar."],
 }
 
 /** Bridge to the socket OWNER.
@@ -83,7 +112,22 @@ export const useExecuteWorkflow = () => {
   // NOT the global isExecuting, which is volatile and lingers between visits) to
   // decide whether to re-attach — avoids clobbering a freshly triggered run.
   const sessionTriggeredRef = useRef(false)
-  const { data: session } = useSession()
+  const { data: session, update: atualizarSessao } = useSession()
+  const atualizarSessaoRef = useRef(atualizarSessao)
+  useEffect(() => { atualizarSessaoRef.current = atualizarSessao }, [atualizarSessao])
+  // The token the socket authenticates with, read in `onopen` — not captured by
+  // the attach. `onopen` runs after the render that opened the socket, and a
+  // reconnect reuses THAT render's closures (onclose → recoverStream →
+  // attachToRun): the token in the closure was the one from when the run was
+  // first attached, so once the API's 30 min access TTL passed, every reconnect
+  // sent the same expired token and got 4401 until it gave up. The ref follows
+  // the session SessionProvider refetches (poll, tab focus) and is refreshed
+  // before each reconnect (see `refreshAccessToken`). An effect keyed on the
+  // token, not a write per render: a render with the provider's older copy must
+  // not overwrite a token the reconnect just fetched.
+  const accessToken = session?.user?.access_token ?? null
+  const accessTokenRef = useRef(accessToken)
+  useEffect(() => { accessTokenRef.current = accessToken }, [accessToken])
 
   // Acessa store para isExecuting e debugMode
   const isExecuting = useWorkflowExecutionStore(s => s.isExecuting)
@@ -175,10 +219,19 @@ export const useExecuteWorkflow = () => {
    *  It is the safety net for a `__workflow_complete__` that did not arrive: the
    *  database knows the outcome even when the live channel failed. */
   async function reconcileRun(taskId: string): Promise<boolean> {
+    // Only the run the store still shows may be closed from here. The store is
+    // global: by the time X's drop is reconciled, the user may be on another
+    // workflow whose live run Y was re-attached — and closing the panel with X's
+    // outcome ended Y as "Concluído/Falhou" while it ran, after which the
+    // RUN_TERMINAL guard discarded every event Y still sent. Checked before the
+    // request and again after it, since the switch can happen during the await.
+    // `false` is the safe answer: the caller re-checks the same refs and stops.
+    if (!stillOnRun(taskId)) return false
     try {
       const detail = await GisFlowService.getRunDetail(taskId)
       const desfecho = TERMINAL_OUTCOME[detail?.data?.status ?? ""]
       if (!desfecho) return false
+      if (!stillOnRun(taskId)) return false
       const store = useWorkflowExecutionStore.getState()
       if (!store.isExecuting) return true
       // `completeExecution` settles the stuck nodes: they started, the run ended,
@@ -189,6 +242,36 @@ export const useExecuteWorkflow = () => {
       // Bad network: nothing can be asserted about the run. Let reconnection
       // try — asserting "failed" here would be inventing an outcome.
       return false
+    }
+  }
+
+  /** This mount still follows `taskId`, and the store still holds that run. */
+  function stillOnRun(taskId: string): boolean {
+    return activeRunRef.current === taskId
+      && useWorkflowExecutionStore.getState().viewingRunId === taskId
+  }
+
+  /** Fetches the session again, for the token `onopen` sends.
+   *
+   *  The drop being recovered may BE the server refusing an expired token
+   *  (4401), and in a tab that keeps focus SessionProvider may not have
+   *  refetched yet. /api/auth/session runs the jwt callback, which refreshes an
+   *  expired access token. Through `useSession().update()`: it KEEPS the
+   *  session when the fetch fails (`getSession` turned the tab anonymous on a
+   *  failed fetch during the very outage that dropped the socket), and it
+   *  updates the provider — so a dead refresh token reaches SessionSync, which
+   *  signs out. "expirada" stops the reconnects: the token will never work. */
+  async function refreshAccessToken(): Promise<"ok" | "expirada" | "falhou"> {
+    try {
+      const fresca = await atualizarSessaoRef.current?.()
+      if (!fresca) return "falhou"
+      if ((fresca as { error?: string }).error === "RefreshTokenExpired") return "expirada"
+      const token = fresca.user?.access_token
+      if (token) accessTokenRef.current = token
+      return "ok"
+    } catch {
+      // Network failure: keep the token we have.
+      return "falhou"
     }
   }
 
@@ -214,7 +297,7 @@ export const useExecuteWorkflow = () => {
     // switched workflows, or an `attachToRun` may have already reopened the
     // socket (the Executar button, the re-attach). Reconnecting on top would
     // open a second connection for the same run.
-    if (activeRunRef.current !== taskId) return
+    if (!stillOnRun(taskId)) return
     if (wsRef.current) return
 
     if (attemptsRef.current >= MAX_RECONEXOES) {
@@ -232,10 +315,19 @@ export const useExecuteWorkflow = () => {
     const base = Math.min(1000 * 2 ** attemptsRef.current, 15_000)
     attemptsRef.current += 1
     cancelReconnect()
+    // Fetched during the backoff, so the reconnect does not wait for it.
+    const tokenRenovado = refreshAccessToken()
     // 50-100% jitter, as in the executor's backoff: several tabs that dropped
     // together don't come back in a burst against the same server.
-    reconexaoRef.current = setTimeout(() => {
+    reconexaoRef.current = setTimeout(async () => {
       reconexaoRef.current = null
+      if ((await tokenRenovado) === "expirada") {
+        // The session is over (SessionSync signs out): reconnecting with a token
+        // that will never be accepted only loops — a socket, a 401 and a refresh
+        // per second, eating the per-IP socket budget of everyone behind the NAT.
+        useWorkflowExecutionStore.getState().setWsState("closed")
+        return
+      }
       // The user may have switched workflows — or reconnected by another route —
       // during the wait.
       if (activeRunRef.current !== taskId || wsRef.current) return
@@ -326,10 +418,20 @@ export const useExecuteWorkflow = () => {
     }
     store.startExecution(initialNodes)
 
+    // The run executes what is STORED, so it only goes out once the canvas is
+    // confirmed saved. Checking only for `error` let every skipped save through
+    // — a Ctrl+S still in flight, a canvas not loaded yet, a missing name — and
+    // the run used the previous definition while the canvas showed this one.
     const respSave = await saveWorkflow({ silent: true })
 
-    if (respSave?.error) {
+    if (respSave.outcome !== "saved") {
       store.resetExecution()
+      // A failed save has already spoken (chip, conflict toast); a skipped one
+      // was silent, so Executar says why nothing ran.
+      if (respSave.outcome === "skipped" && respSave.skipReason) {
+        const [titulo, descricao] = RUN_NOT_SAVED[respSave.skipReason]
+        createToast.info(titulo, descricao)
+      }
       return
     }
 
@@ -363,6 +465,17 @@ export const useExecuteWorkflow = () => {
   // replays the run's whole history (Redis) and then streams live. Returns the
   // socket so the caller can close it (e.g. when switching workflows).
   function attachToRun(taskId: string): WebSocket {
+    // The server replays the run's COMPLETE history on every connect (Redis
+    // `LRANGE 0 -1`), and `appendEvents` only appends. When the store already
+    // holds this run's log — a reconnect after a drop, or a re-attach that kept
+    // the progress already painted — the replay landed on top of it: every
+    // print() line, the "Saída" count, Copiar/Baixar and the rotation all
+    // doubled (tripled on the next drop). The log is swapped for the replay
+    // when its first batch arrives (see `onmessage`); the canvas is left alone,
+    // since the replay re-applies the lifecycle in order and ends on the same
+    // node states. Not on attach: a reconnect that fails before any frame (a
+    // 4401, the server down) would leave the panel empty for nothing.
+    let replayReplacesLog = useWorkflowExecutionStore.getState().viewingRunId === taskId
     // Closes any previous connection (intentionally) before opening the new one, so
     // there are never two WSs writing to the store at the same time.
     closeOnPurpose(wsRef.current)
@@ -377,13 +490,23 @@ export const useExecuteWorkflow = () => {
     useWorkflowExecutionStore.getState().setWsState("connecting")
 
     ws.onopen = () => {
-      const token = session?.user?.access_token ?? ""
-      if (token) ws.send(token)
+      // From the ref, at open time — see `accessTokenRef`. A token about to
+      // expire is renewed first (the server waits a few seconds for it): sent
+      // as is, the first socket of a run in a tab focused past the access TTL
+      // always got a 4401 and a reconnect.
+      const enviarToken = () => {
+        const token = accessTokenRef.current ?? ""
+        // Not on a socket already closing/closed (2/3) while the renewal ran.
+        if (token && ws.readyState !== 2 && ws.readyState !== 3) ws.send(token)
+      }
+      if (tokenVencendo(accessTokenRef.current)) {
+        void refreshAccessToken().then(enviarToken)
+      } else {
+        enviarToken()
+      }
       // The socket's REAL state — the panel's "live" indicator reads from here instead
       // of inferring from isExecuting, which stayed green with the socket dead.
       useWorkflowExecutionStore.getState().setWsState("open")
-      // Connection is up: the next stumble restarts the backoff from zero.
-      attemptsRef.current = 0
       // Arms the inactivity watchdog. `onopen` already counts as traffic; from here on
       // the server sends a heartbeat every ~20s, so silence only grows if the
       // socket died (Safari) — and then the watchdog recovers.
@@ -551,11 +674,49 @@ export const useExecuteWorkflow = () => {
       drainBatch()
     }
 
+    // First content on this socket = the start of the server's replay. Clears
+    // the log it is about to redeliver (events, rotation and server discard
+    // counts, outcome) before anything of the replay is counted, so nothing of
+    // it is wiped either. The run's start and the sub-workflow groups are kept:
+    // the server keeps only the last 5000 events, so a long run's replay no
+    // longer carries them. Node states stay: see `replayReplacesLog`.
+    //
+    // Only when the batch really REPEATS what the panel has: a first batch that
+    // starts after the newest event already shown is not a replay (the server's
+    // history expired or was lost) — clearing then would wipe the whole log for
+    // a handful of live lines.
+    //
+    // "Repeats" is decided by CONTENT, not by clocks: the event times come from
+    // the executor, whose clock can step back. A replay redelivers events the
+    // panel already shows; a live-only batch shares none with it.
+    function startReplay(eventos: RawEvent[]) {
+      if (!replayReplacesLog) return
+      replayReplacesLog = false
+      const estado = useWorkflowExecutionStore.getState()
+      if (estado.events.length > 0) {
+        const mostrados = new Set(estado.events.map(e => chaveDoEvento(e.ts / 1000, e.node, e.status, e.kind)))
+        const repete = eventos.slice(0, 200).some(ev =>
+          mostrados.has(chaveDoEvento(ev.timestamp, ev.node, ev.status, eventKind(ev))))
+        if (!repete) return
+      }
+      const perdidosAntes = descartadosAntesDoReplay
+      estado.restartLogForReplay()
+      // A batch lost on THIS socket before the replay started belongs to the
+      // new log too: resetting the count hid the warning.
+      if (perdidosAntes > 0) estado.registrarDescartados(perdidosAntes)
+    }
+    let descartadosAntesDoReplay = 0
+
     ws.onmessage = (event) => {
       // ANY frame counts as a sign of life — including the heartbeat (empty batch)
       // and even an unreadable frame: what the watchdog watches is the transport's
       // silence, not the content. That is why it is the FIRST line, before parsing.
       lastMsgRef.current = Date.now()
+      // A frame arrived AFTER the token was accepted (a refused token closes
+      // before any): the connection really works, the next stumble restarts
+      // the backoff from zero. Resetting on `onopen` let a refused token loop
+      // forever under the attempt ceiling.
+      attemptsRef.current = 0
 
       // The server builds the frame by concatenating raw strings from Redis, so a
       // single corrupted item invalidates the JSON of the ENTIRE batch — including
@@ -567,9 +728,13 @@ export const useExecuteWorkflow = () => {
         frame = JSON.parse(event.data)
       } catch (err) {
         console.error("[ws/workflow] frame ilegível — lote descartado", err)
+        // Not a decision point for the replay: with nothing readable there is
+        // no telling whether it repeats the log, and wiping it on a corrupted
+        // frame would lose more than it saves. The next readable batch decides.
         // Counts it as a visible loss: the "Bruto" (raw) tab shows the warning instead
         // of the log looking complete.
         useWorkflowExecutionStore.getState().registrarDescartados(1)
+        if (replayReplacesLog) descartadosAntesDoReplay += 1
         return
       }
 
@@ -583,6 +748,9 @@ export const useExecuteWorkflow = () => {
       // started sending the live stream in batches left the immediate-completion
       // path dead.
       const eventos: RawEvent[] = Array.isArray(frame?.events) ? frame.events : []
+
+      // Before the `dropped` below: it belongs to the new log.
+      if (eventos.length > 0) startReplay(eventos)
 
       // SERVER back-pressure (the 500-slot buffer evicts old stdout).
       // Without adding this up, the "Bruto" tab drops the warning and the user

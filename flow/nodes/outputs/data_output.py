@@ -21,6 +21,8 @@ from flow.utils.geo_helpers import gdf_para_geojson
 
 @register_node
 class DataOutput(BaseNode):
+
+    TEM_EFEITO_COLATERAL = True
     @classmethod
     def description(cls) -> dict:
         return {

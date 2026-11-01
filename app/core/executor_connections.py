@@ -2058,10 +2058,17 @@ class ExecutorConnectionRegistry:
                     conn.capacity.get("running", 0),
                 )
                 return False
+            # Registered BEFORE the send: the executor ACKs within milliseconds of
+            # receiving the frame, and an ACK that arrived before this record
+            # found nothing to clear — the record written right after then
+            # lived its full 600 s, raising false "ACK overdue" alarms and
+            # making the reconciliation treat the run as in transit.
+            await self.record_pending_ack(job_id, executor_id)
             try:
                 resultado = await saida.enviar(wire_text)
             except Exception as exc:
                 logger.error("Erro ao enviar job ao executor '%s': %s", executor_id, exc)
+                await self.clear_pending_ack(job_id, expected_executor_id=executor_id)
                 # `expected_ws`: the executor may have already reconnected on THIS worker
                 # while the send was failing — dropping the new connection would only
                 # cause another reconnection.
@@ -2069,6 +2076,7 @@ class ExecutorConnectionRegistry:
                 return False
             if resultado in (BUSY, CLOSING):
                 # Nothing was written: the next candidate gets the job.
+                await self.clear_pending_ack(job_id, expected_executor_id=executor_id)
                 logger.warning(
                     "Job '%s' não saiu para o executor '%s' (%s) — vai ao próximo candidato.",
                     job_id, executor_id, resultado,
@@ -2083,7 +2091,6 @@ class ExecutorConnectionRegistry:
                 )
             else:
                 logger.info("Job '%s' enviado ao executor '%s' via WebSocket.", job_id, executor_id)
-            await self.record_pending_ack(job_id, executor_id)
             return True
 
         # ── Relay path: WS is on another uvicorn worker ──────────────────────
@@ -2113,6 +2120,9 @@ class ExecutorConnectionRegistry:
             )
             return False
 
+        # Before the publish, for the same reason as the direct path. Tracking
+        # is shared via Redis: the ACK is cleared on whichever worker holds the WS.
+        await self.record_pending_ack(job_id, executor_id)
         try:
             # Signed envelope — the listener validates the HMAC before forwarding to the WS.
             # Protects against an unauthorized publisher on the Redis channel.
@@ -2126,14 +2136,13 @@ class ExecutorConnectionRegistry:
                     "Executor '%s' online no Redis mas sem relay listener ativo — job não enviado.",
                     executor_id,
                 )
+                await self.clear_pending_ack(job_id, expected_executor_id=executor_id)
                 return False
             logger.info("Job '%s' encaminhado via relay Redis ao executor '%s'.", job_id, executor_id)
-            # Tracking shared via Redis: registering here is safe even
-            # with the WS on another worker — the ACK will be cleared there.
-            await self.record_pending_ack(job_id, executor_id)
             return True
         except Exception as exc:
             logger.error("Erro no relay Redis para executor '%s': %s", executor_id, exc)
+            await self.clear_pending_ack(job_id, expected_executor_id=executor_id)
             return False
 
     async def send_json(self, executor_id: str, data: dict) -> bool:

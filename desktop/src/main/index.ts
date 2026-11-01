@@ -18,13 +18,15 @@ import {
 import { PythonSupervisor } from './python/supervisor.js'
 import { enrolar, type EnrollRequest } from './python/enroll.js'
 import {
-  artifactsDirEfetivo, descartarEnrollment, gravarExecucao, gravarGeoSync,
+  artifactsDirEfetivo, caminhoParaAbrir, descartarEnrollment, gravarExecucao, gravarGeoSync,
   lerConfiguracao, lerExecucao, lerGeoSync, validateFolder,
   type RunConfig, type ConfigGeoSync, type ConfigState,
 } from './state/config.js'
 import { ESTRATEGIAS, SYNC_MODES, SYNC_DEFAULTS } from '../shared/geosync.js'
 import { consultarStatusCacheado, invalidarStatus } from './python/status.js'
-import { interpretar, registerProtocol, urlDosArgumentos } from './deeplink.js'
+import {
+  interpretar, registerProtocol, semOtp, urlDosArgumentos, type DeepLinkRequest,
+} from './deeplink.js'
 import { startUpdater, installNow, stopUpdater } from './updater.js'
 import { AppStore } from './state/store.js'
 import { updateTray, createTray, destroyTray } from './ui/tray.js'
@@ -58,8 +60,11 @@ const store = new AppStore()
 // Deep link that arrived before the renderer existed. Without this, an
 // `atlans://` that OPENS the app would be lost: the window has not yet
 // subscribed to the channel when the event is emitted, and the form would
-// show up empty.
-let deepLinkPendente: ReturnType<typeof interpretar> = null
+// show up empty. Kept only under the conditions of `guardarDeepLink`.
+let deepLinkPendente: { pedido: DeepLinkRequest; expiraEm: number } | null = null
+
+/** How long a kept deep link waits for the form to mount. */
+const VALIDADE_DEEP_LINK_MS = 10 * 60_000
 let supervisor: PythonSupervisor | null = null
 let encerrando = false
 // Signature of the last status sent to the web window — push dedupe. See the
@@ -86,9 +91,10 @@ function createSupervisor(): PythonSupervisor {
   const sup = new PythonSupervisor({
     pythonExe: PYTHON_EXE,
     cwd: RESOURCES,
-    // Reads the `.env` on every spawn: setting the folder in Ajustes (Settings)
-    // and restarting the executor has to take effect without reopening the app.
-    env: ambienteDoSpawn(envDoExecutor(artifactsDirEfetivo(ARTIFACTS_DIR_PADRAO))),
+    // A factory, so the `.env` is read on every spawn: setting the folder in
+    // Ajustes (Settings) and restarting the executor has to take effect without
+    // reopening the app.
+    env: () => ambienteDoSpawn(envDoExecutor(artifactsDirEfetivo(ARTIFACTS_DIR_PADRAO))),
   })
 
   sup.on('estado', (estado, detalhe) => {
@@ -198,7 +204,7 @@ function registerIpc(): void {
   ipcMain.handle(CHANNELS.deepLinkPendente, () => {
     const p = deepLinkPendente
     deepLinkPendente = null   // consumed only once
-    return p
+    return p && Date.now() < p.expiraEm ? p.pedido : null
   })
 
   ipcMain.handle(CHANNELS.enrolar, async (_e, pedido: unknown) => {
@@ -280,15 +286,17 @@ function registerIpc(): void {
   ipcMain.handle(CHANNELS.abrirCaminho, async (_e, caminho: unknown) => {
     // Only paths the app itself knows. Opening an arbitrary path coming from
     // the renderer would give any displayed content (a workflow log, for
-    // example) the power to launch an executable.
-    const permitidos = [
-      ENV_FILE, CERT_DIR, LOG_DIR, ARTIFACTS_DIR_PADRAO,
+    // example) the power to launch an executable. The folders must also BE
+    // folders: two of them come from the `.env`, which the renderer writes —
+    // see `caminhoParaAbrir`.
+    const alvo = caminhoParaAbrir(caminho, [ENV_FILE], [
+      CERT_DIR, LOG_DIR, ARTIFACTS_DIR_PADRAO,
       artifactsDirEfetivo(ARTIFACTS_DIR_PADRAO),
       // Pasta do GeoSync: o usuario a escolheu, e a tela oferece 'Abrir'.
       lerGeoSync().pasta,
-    ].filter((p): p is string => Boolean(p))
-    if (typeof caminho !== 'string' || !permitidos.includes(caminho)) return
-    await shell.openPath(caminho)
+    ])
+    if (!alvo) return
+    await shell.openPath(alvo)
   })
 
   ipcMain.handle(CHANNELS.geosync, () => lerGeoSync())
@@ -299,18 +307,26 @@ function registerIpc(): void {
 
     const pasta = typeof c.pasta === 'string' && c.pasta.trim() ? c.pasta.trim() : null
     const invalida = validateFolder(pasta)
+    const invalidas = invalida ? [invalida] : []
 
-    gravarGeoSync({
-      // An invalid folder is not saved, but the rest of the settings are: refusing
-      // everything because the folder was removed from disk would block editing
-      // the mode and the workspace. The reason goes back to the renderer in
-      // `invalidas`.
-      pasta: invalida ? null : pasta,
-      modo: SYNC_MODES.includes(c.modo) ? c.modo : SYNC_DEFAULTS.modo,
-      conflito: ESTRATEGIAS.includes(c.conflito) ? c.conflito : SYNC_DEFAULTS.conflito,
-      workspaceId: typeof c.workspaceId === 'string' && c.workspaceId.trim() ? c.workspaceId.trim() : null,
-    })
-    return { salvo: true, invalidas: invalida ? [invalida] : [] }
+    try {
+      gravarGeoSync({
+        // An invalid folder is not saved, but the rest of the settings are: refusing
+        // everything because the folder was removed from disk would block editing
+        // the mode and the workspace. The reason goes back to the renderer in
+        // `invalidas`.
+        pasta: invalida ? null : pasta,
+        modo: SYNC_MODES.includes(c.modo) ? c.modo : SYNC_DEFAULTS.modo,
+        conflito: ESTRATEGIAS.includes(c.conflito) ? c.conflito : SYNC_DEFAULTS.conflito,
+        workspaceId: typeof c.workspaceId === 'string' && c.workspaceId.trim() ? c.workspaceId.trim() : null,
+      })
+    } catch (err) {
+      // `gravarEnv` refuses a value with a line break (it would inject a
+      // variable into the `.env`) before writing anything; the disk can also
+      // say no. Either way the screen keeps the edits and shows why.
+      return { salvo: false, invalidas, erro: (err as Error).message }
+    }
+    return { salvo: true, invalidas }
   })
 
   ipcMain.handle(CHANNELS.workspaces, (_e, atualizar?: unknown) => (
@@ -323,8 +339,16 @@ function registerIpc(): void {
     // `gravarExecucao` reapplies the ranges from executor/config.py — the
     // renderer validates to give immediate feedback, but this side is the one
     // that guarantees it.
-    gravarExecucao(cfg as RunConfig)
-    return lerExecucao(ARTIFACTS_DIR_PADRAO)
+    try {
+      gravarExecucao(cfg as RunConfig)
+    } catch (err) {
+      // Refused before writing anything (a file in place of the artifacts
+      // folder, a line break in a value) or the disk said no. A thrown handler
+      // reaches the renderer as an opaque rejection; this way the screen keeps
+      // the edits and says why.
+      return { salvo: false, config: lerExecucao(ARTIFACTS_DIR_PADRAO), erro: (err as Error).message }
+    }
+    return { salvo: true, config: lerExecucao(ARTIFACTS_DIR_PADRAO) }
   })
 
   ipcMain.handle(CHANNELS.exportarLog, async (_e, texto: unknown) => {
@@ -381,28 +405,44 @@ app.on('second-instance', (_evento, argv) => {
   abrirJanelaWeb()
 })
 
+/**
+ * Keeps a deep link for an Onboarding that mounts in the next minutes.
+ *
+ * Only the Onboarding listens to the push, and the main process cannot tell
+ * whether one is mounted: a machine still enrolled but REVOKED shows the panel,
+ * and the web's "Abrir no app" link is exactly what the user wants once they
+ * click "Refazer enrollment". So the request is always kept — but only for
+ * `VALIDADE_DEEP_LINK_MS`: before, it sat in memory until a "Refazer
+ * enrollment" days later popped "Vincular este computador?" filled in by
+ * whatever page had sent the link.
+ */
+function guardarDeepLink(pedido: DeepLinkRequest): void {
+  deepLinkPendente = { pedido, expiraEm: Date.now() + VALIDADE_DEEP_LINK_MS }
+}
+
 function handleDeepLink(bruta: string): void {
   const pedido = interpretar(bruta)
   if (!pedido) {
     // Silent refusal for the user, loud in the log: a malformed deep link is
     // almost always a page trying something, and it is not worth an alert that
-    // teaches people to ignore alerts.
-    store.registrarLinhaBruta(`[app] Deep link recusado: ${bruta.slice(0, 120)}`, 'stderr')
+    // teaches people to ignore alerts. Without the OTP: the log is exportable.
+    store.registrarLinhaBruta(`[app] Deep link recusado: ${semOtp(bruta).slice(0, 120)}`, 'stderr')
     return
   }
-  deepLinkPendente = pedido
+  guardarDeepLink(pedido)
   broadcast(CHANNELS.aoReceberDeepLink, pedido)
   abrirJanela()
 }
 
 app.whenReady().then(() => {
-  // Before ensureDirectories: the migration only happens while the new folder
-  // does not exist yet.
+  // Before ensureDirectories: the migration only happens while the new
+  // config/ and certs/ are missing or empty.
   const migrado = migrateLegacyData()
   ensureDirectories()
   if (migrado) {
+    // Says what moved — never more than that.
     store.registrarLinhaBruta(
-      `[app] Dados migrados de "${migrado}" para "AtlansExecutor" — certificado e configuração preservados.`,
+      `[app] Dados migrados de "${migrado.origem}" para "AtlansExecutor": ${migrado.movidas.join(', ')}.`,
       'stderr',
     )
   }
@@ -431,10 +471,8 @@ app.whenReady().then(() => {
 
   // A deep link that OPENED the app arrives in the process's own argv.
   const initialUrl = urlDosArgumentos(process.argv)
-  if (initialUrl) {
-    const pedido = interpretar(initialUrl)
-    if (pedido) deepLinkPendente = pedido
-  }
+  const pedidoInicial = initialUrl ? interpretar(initialUrl) : null
+  if (pedidoInicial) guardarDeepLink(pedidoInicial)
 
   const cfg = lerConfiguracao()
   if (cfg.configurado) {
@@ -462,7 +500,7 @@ app.whenReady().then(() => {
   // a window: an unconfigured app that starts at logon and does not show up
   // would leave the person with no clue what to do, so that case still opens
   // the web window.
-  if (deepLinkPendente) abrirJanela()
+  if (pedidoInicial) abrirJanela()
   else if (!(cfg.configurado && startedHidden())) abrirJanelaWeb()
 })
 

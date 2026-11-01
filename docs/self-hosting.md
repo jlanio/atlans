@@ -209,6 +209,33 @@ still stops at "Pool overlaps with other one on this address space", a network
 created after the bootstrap took the range: run `make bootstrap` again, or pick
 a free one by hand (see `PROXY_NET_SUBNET` in `.env.example`).
 
+### Traefik's fixed IP
+
+The executors' identity reaches the API in a header Traefik writes after it
+validates their certificate. The API accepts that header only from
+`MTLS_PROXIES`, which the compose file points at Traefik's fixed IP
+(`TRAEFIK_IP`). Without it, the header is accepted from the whole
+`TRUSTED_PROXIES` range (`172.16.0.0/12` by default): every container on the
+Docker networks, the web and MinIO included, could present it — it still needs
+the serial of a valid certificate, but that is the only barrier left.
+
+When it creates `proxy-net` (a new installation), `make bootstrap` writes
+`TRAEFIK_IP` with the last address of the range. Where `proxy-net` already
+exists, turn it on by hand:
+
+```bash
+docker network inspect proxy-net --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+# e.g. 172.29.0.0/16 -> the last address, 172.29.255.254, goes in the .env:
+echo 'TRAEFIK_IP=172.29.255.254' >> .env
+docker compose --profile prod up -d      # recreates Traefik and the API together
+```
+
+If Traefik then fails with "user specified IP address is supported only when
+connecting to networks with user configured subnets", that `proxy-net` was
+created without a declared range: remove `TRAEFIK_IP` (everything goes back to
+how it was) or recreate the network (`docker compose --profile prod down`, then
+`docker network rm proxy-net` and `make up-prod`).
+
 The API never migrates on its own: `make up-prod` applies the migrations after
 asking, and by hand it is `docker compose --profile prod exec api-prod alembic upgrade head`.
 The manual step-by-step procedure for the CA is in [mtls-bootstrap.md](mtls-bootstrap.md).

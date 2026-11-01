@@ -557,3 +557,62 @@ def test_credential_drops_authorization_of_any_case():
     auth_headers = [k for k in recebido["headers"] if k.lower() == "authorization"]
     assert auth_headers == ["Authorization"]
     assert recebido["headers"]["Authorization"] == "Bearer DA-CREDENCIAL"
+
+
+def test_a_refused_redirect_hop_after_a_post_is_not_retryable_by_the_executor():
+    """The POST was applied (it is what answered the 303); a connection refused
+    on the redirect target must not read as "nothing was sent", or the executor
+    repeats the POST (fix review)."""
+    import httpx
+
+    from flow.utils.error_taxonomy import did_not_reach_the_destination
+
+    chamadas = []
+
+    async def falsa(**kw):
+        chamadas.append(kw["method"])
+        if len(chamadas) == 1:
+            return FakeResponse(303, headers={"location": "https://fora.exemplo.com/pronto"})
+        raise httpx.ConnectError("connection refused")
+
+    no = _no(method="POST", body='{"a":1}', followRedirects=True)
+    with patch("flow.nodes.action.http_request.safe_httpx_request", side_effect=falsa):
+        with pytest.raises(Exception) as erro:
+            asyncio.run(no.execute({}))
+
+    assert did_not_reach_the_destination(erro.value) is False
+    assert chamadas == ["POST", "GET"]
+
+
+def test_a_connect_timeout_sent_nothing():
+    import httpx
+
+    from flow.utils.error_taxonomy import did_not_reach_the_destination
+
+    assert did_not_reach_the_destination(httpx.ConnectTimeout("handshake")) is True
+    assert did_not_reach_the_destination(httpx.ReadTimeout("no answer")) is False
+
+
+def test_a_failed_307_hop_keeps_its_own_meaning():
+    """A 307/308 asks to repeat the request elsewhere: there is no proof the
+    original was applied, so a refused connection there still allows the
+    executor's retry (round-2 review)."""
+    import httpx
+
+    from flow.utils.error_taxonomy import did_not_reach_the_destination
+
+    chamadas = []
+
+    async def falsa(**kw):
+        chamadas.append(kw["method"])
+        if len(chamadas) == 1:
+            return FakeResponse(307, headers={"location": "https://fora.exemplo.com/outro"})
+        raise httpx.ConnectError("connection refused")
+
+    no = _no(method="POST", body='{"a":1}', followRedirects=True)
+    with patch("flow.nodes.action.http_request.safe_httpx_request", side_effect=falsa):
+        with pytest.raises(Exception) as erro:
+            asyncio.run(no.execute({}))
+
+    assert chamadas == ["POST", "POST"]
+    assert did_not_reach_the_destination(erro.value) is True

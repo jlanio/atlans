@@ -42,10 +42,26 @@ const BACKOFF_MAX_MS = 60_000
  */
 export const TIMEOUT_SHUTDOWN_MS = 150_000
 
+/**
+ * How long after `exit` we wait for `close` before finalizing anyway.
+ *
+ * `close` normally follows within milliseconds, once the pipes are drained. A
+ * grandchild that inherited the pipes (a tool a workflow node launched) can
+ * keep them open long after Python died, and must not pin the supervisor in
+ * `running` with no executor.
+ */
+const ESPERA_CLOSE_MS = 2_000
+
 export interface SupervisorOptions {
   pythonExe: string
   cwd: string
-  env: NodeJS.ProcessEnv
+  /**
+   * Environment of the executor. A factory is called on EVERY spawn: the
+   * values depend on the `.env` (the artifacts folder set in Ajustes), and a
+   * snapshot taken once at boot kept handing the restarted executor the old
+   * folder — python-dotenv does not override what the process env already has.
+   */
+  env: NodeJS.ProcessEnv | (() => NodeJS.ProcessEnv)
   /** Injectable for testing. */
   spawnFn?: typeof spawn
   agora?: () => number
@@ -75,6 +91,8 @@ export class PythonSupervisor extends EventEmitter {
    * in the middle of a job, with results never confirmed to the server.
    */
   private paradaEmCurso: Promise<void> | null = null
+  /** Resolves `paradaEmCurso` — called when the process is finalized. */
+  private resolverParada: (() => void) | null = null
   /** Instant at which the watchdog of the stop in progress fires. */
   private prazoShutdown = 0
   /**
@@ -108,11 +126,22 @@ export class PythonSupervisor extends EventEmitter {
     this.pareiDeProposito = false
     this.drenando = false
     this.cancelarBackoff()
+
+    // Resolved here, not in the constructor — see `SupervisorOptions.env`.
+    // A factory that throws (unreadable `.env`) must not escape: `start()` also
+    // runs from the backoff timer, where a throw is an uncaught exception in main.
+    let env: NodeJS.ProcessEnv
+    try {
+      env = typeof this.opcoes.env === 'function' ? this.opcoes.env() : this.opcoes.env
+    } catch (err) {
+      this.mudarEstado('failed', `nao foi possivel montar o ambiente do executor: ${(err as Error).message}`)
+      return
+    }
     this.mudarEstado('starting')
 
     const proc = this.spawnFn(this.opcoes.pythonExe, ['-X', 'utf8', '-m', 'executor'], {
       cwd: this.opcoes.cwd,
-      env: this.opcoes.env,
+      env,
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     }) as ChildProcessWithoutNullStreams
@@ -129,25 +158,59 @@ export class PythonSupervisor extends EventEmitter {
     proc.stdout.on('data', (c: string) => parser.push(c))
     proc.stderr.setEncoding('utf8')
     proc.stderr.on('data', (c: string) => stderr.push(c))
-
-    proc.on('error', (err) => {
-      // Failure in the spawn itself (missing python.exe, permissions). No point
-      // retrying with backoff: it will not fix itself.
-      this.proc = null
-      this.limparParada()
-      this.mudarEstado('failed', `nao foi possivel iniciar o executor: ${err.message}`)
+    // A write to a process that is already going away fails ASYNCHRONOUSLY
+    // (EPIPE, or ERROR_NO_DATA on Windows), as an 'error' on the stream — the
+    // try/catch in `enviar` never sees it. Without a listener it becomes an
+    // uncaught exception in main, the "JavaScript error in the main process"
+    // dialog, for a command that simply arrived too late.
+    proc.stdin.on('error', (err) => {
+      this.emit('linha', `[supervisor] stdin do executor: ${err.message}`, 'stderr')
     })
 
-    proc.on('exit', (codigo, sinal) => {
+    // Finalization runs ONCE per process, on `close` and not on `exit`: Node
+    // fires `exit` while stdout may still hold the executor's last lines, and
+    // the `state: failed` (revoked, expired cert) is written right before
+    // `sys.exit(1)`. Deciding on `exit` could restart an executor that had
+    // just said "do not restart me".
+    let finalizado = false
+    let timerClose: NodeJS.Timeout | null = null
+    const finalizar = (codigo: number | null, sinal: NodeJS.Signals | null): void => {
+      if (finalizado) return
+      finalizado = true
+      if (timerClose) clearTimeout(timerClose)
       parser.flush()
       stderr.flush()
+      // A late `close` of an abandoned process must not clear the NEXT one.
+      if (this.proc !== proc) return
       this.proc = null
       // Before `aoSair` and before stop()'s `resolve`: the next `stop()` must
       // find the field cleared, otherwise it would return the promise of a
       // stop that has already finished.
+      const resolver = this.resolverParada
       this.limparParada()
       this.aoSair(codigo, sinal)
+      resolver?.()
+    }
+
+    proc.on('error', (err) => {
+      // Failure in the spawn itself (missing python.exe, permissions). No point
+      // retrying with backoff: it will not fix itself. Node still emits
+      // `close` afterwards; `finalizado` makes it a no-op.
+      finalizado = true
+      if (timerClose) clearTimeout(timerClose)
+      if (this.proc !== proc) return
+      this.proc = null
+      const resolver = this.resolverParada
+      this.limparParada()
+      this.mudarEstado('failed', `nao foi possivel iniciar o executor: ${err.message}`)
+      resolver?.()
     })
+
+    proc.on('exit', (codigo, sinal) => {
+      // Only a guard — see ESPERA_CLOSE_MS.
+      if (!finalizado) timerClose = setTimeout(() => finalizar(codigo, sinal), ESPERA_CLOSE_MS)
+    })
+    proc.on('close', (codigo: number | null, sinal: NodeJS.Signals | null) => finalizar(codigo, sinal))
   }
 
   // ── Stop ─────────────────────────────────────────────────────────────────
@@ -184,7 +247,10 @@ export class PythonSupervisor extends EventEmitter {
     }
 
     this.paradaEmCurso = new Promise<void>((resolve) => {
-      proc.once('exit', () => resolve())
+      // Resolved by the finalization (`close`), not by `exit`: `restart()`
+      // calls `start()` right after, and `start()` does nothing while
+      // `this.proc` is still set.
+      this.resolverParada = resolve
       this.mudarEstado('draining')
       if (!this.enviar({ cmd: 'shutdown', id: 'stop' })) {
         // stdin already closed — there is no way to ask politely.
@@ -230,6 +296,15 @@ export class PythonSupervisor extends EventEmitter {
   forcar(): void {
     this.pareiDeProposito = true
     this.cancelarBackoff()
+    // No process: the click came during the restart backoff, with the
+    // "Encerrando" alert still on screen. Killing nothing and leaving the state
+    // alone stranded the supervisor in `restarting`, with no timer and no
+    // process — and the panel offers no "Iniciar" in that state. A `failed`
+    // keeps its cause: it is what the user has to act on.
+    if (!this.proc) {
+      if (this._estado !== 'failed') this.mudarEstado('stopped')
+      return
+    }
     this.matarAForca()
   }
 
@@ -265,7 +340,11 @@ export class PythonSupervisor extends EventEmitter {
     const proc = this.proc
     if (!proc || proc.stdin.destroyed || !proc.stdin.writable) return false
     try {
-      proc.stdin.write(JSON.stringify(cmd) + '\n')
+      // `true` means "queued", not "delivered": the pipe can still break before
+      // Python reads it. The callback is where that shows up.
+      proc.stdin.write(JSON.stringify(cmd) + '\n', (err) => {
+        if (err) this.emit('linha', `[supervisor] comando "${cmd.cmd}" nao chegou ao executor: ${err.message}`, 'stderr')
+      })
       return true
     } catch {
       return false
@@ -282,7 +361,10 @@ export class PythonSupervisor extends EventEmitter {
       if (evt.data.phase === 'failed') {
         // Boot failure with a known cause (cert, server key). Repeating does not
         // help: the condition is persistent and the user needs to act.
+        // Authoritative whenever it arrives: if the exit was already handled
+        // and a restart is waiting in the backoff, it is cancelled here.
         this.pareiDeProposito = true
+        this.cancelarBackoff()
         this.mudarEstado('failed', evt.data.detail ?? evt.data.step ?? 'falha no boot')
       }
     }
@@ -358,6 +440,7 @@ export class PythonSupervisor extends EventEmitter {
     this.limparTimerShutdown()
     this.prazoShutdown = 0
     this.paradaEmCurso = null
+    this.resolverParada = null
   }
 
   private mudarEstado(estado: SupervisorState, detalhe?: string): void {

@@ -351,6 +351,11 @@ class FakeRedis:
         self.chamadas.append(("mget", chaves))
         return [self.dados.get(chave) for chave in chaves]
 
+    async def getdel(self, chave):
+        self.chamadas.append(("getdel", chave))
+        self.ttls.pop(chave, None)
+        return self.dados.pop(chave, None)
+
     async def set(self, chave, valor, nx: bool = False, ex: int | None = None):
         self.chamadas.append(("set", chave, nx, ex))
         if nx and chave in self.dados:

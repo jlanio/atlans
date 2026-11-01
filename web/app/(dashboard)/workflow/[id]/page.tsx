@@ -4,7 +4,7 @@ import { FlowContextProvider } from "@/context/useFlowContext"
 import { IWorkflow } from "@/service/types"
 import { ReactFlowProvider } from "@xyflow/react"
 import { useParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import '@xyflow/react/dist/style.css';
 import { GisFlowService } from "@/service/GisFlowService"
@@ -16,6 +16,13 @@ export default function WorkFlowCreatePage() {
   const { status } = useSession()
   const [workflow, setWorkflow] = useState<IWorkflow>()
   const [error, setError] = useState<string | null>(null)
+  // Number of the latest load. Navigating /workflow/A → /workflow/B keeps this
+  // page mounted and fires a second request while A's may still be in flight;
+  // the two are different URLs, so nothing dedups or cancels them. Whichever
+  // answered LAST used to win: a slow A landing after B hydrated A's graph,
+  // name and etag under route B — and the next save, addressed by the route id,
+  // wrote A over B. Only the answer to the latest load is applied.
+  const ultimaCargaRef = useRef(0)
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -25,8 +32,12 @@ export default function WorkFlowCreatePage() {
   }, [status, id])
 
   async function getWorkflow() {
+    const carga = ++ultimaCargaRef.current
     setError(null)
     const res = await GisFlowService.getWorkflowById(id)
+    // A newer load started meanwhile (another id, a retry, a version restore):
+    // this answer is no longer the one the screen is waiting for.
+    if (carga !== ultimaCargaRef.current) return
     if (!res.success || !res.data) {
       setError(res.error?.message ?? "Não foi possível carregar o workflow.")
       return

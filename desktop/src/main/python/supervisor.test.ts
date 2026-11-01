@@ -22,9 +22,10 @@ class FakeProc extends EventEmitter {
 
   kill(): boolean { this.killed = true; return true }
 
-  /** Simulates the process exiting. */
+  /** Simulates the process exiting: `exit`, then `close` once stdio is drained — Node's order. */
   sair(codigo: number | null, sinal: NodeJS.Signals | null = null): void {
     this.emit('exit', codigo, sinal)
+    this.emit('close', codigo, sinal)
   }
 
   emitir(obj: unknown): void {
@@ -32,9 +33,9 @@ class FakeProc extends EventEmitter {
   }
 }
 
-function criar() {
+function criar(env: NodeJS.ProcessEnv | (() => NodeJS.ProcessEnv) = {}) {
   const procs: FakeProc[] = []
-  const spawnFn = vi.fn(() => {
+  const spawnFn = vi.fn((_exe: string, _args: string[], _opts: { env?: NodeJS.ProcessEnv }) => {
     const p = new FakeProc()
     procs.push(p)
     return p
@@ -43,7 +44,7 @@ function criar() {
   const sup = new PythonSupervisor({
     pythonExe: 'python',
     cwd: '.',
-    env: {},
+    env,
     spawnFn: spawnFn as never,
   })
   sup.on('estado', (e, d) => estados.push([e, d]))
@@ -84,6 +85,35 @@ describe('start', () => {
     procs[0]!.emit('error', new Error('ENOENT'))
     await tick()
     expect(sup.estado).toBe('failed')
+  })
+})
+
+describe('ambiente do spawn', () => {
+  it('relê o ambiente a cada spawn', async () => {
+    // The artifacts folder comes from the `.env`. Computed once at boot, the
+    // executor restarted after "Salvar" + "Reiniciar agora" kept receiving the
+    // old folder in its environment — which python-dotenv does not override.
+    let pasta = 'C:/antiga'
+    const { sup, procs, spawnFn } = criar(() => ({ EXECUTOR_ARTIFACTS_DIR: pasta }))
+    sup.start()
+    pasta = 'D:/nova'
+    const p = sup.restart()
+    await tick()
+    procs[0]!.sair(0)
+    await p
+
+    expect(spawnFn).toHaveBeenCalledTimes(2)
+    expect(spawnFn.mock.calls[0]![2].env?.EXECUTOR_ARTIFACTS_DIR).toBe('C:/antiga')
+    expect(spawnFn.mock.calls[1]![2].env?.EXECUTOR_ARTIFACTS_DIR).toBe('D:/nova')
+  })
+
+  it('falha ao montar o ambiente vira failed, sem lançar', () => {
+    // `start()` also runs from the backoff timer: a throw there would be an
+    // uncaught exception in the main process.
+    const { sup, spawnFn } = criar(() => { throw new Error('EACCES') })
+    expect(() => sup.start()).not.toThrow()
+    expect(sup.estado).toBe('failed')
+    expect(spawnFn).not.toHaveBeenCalled()
   })
 })
 
@@ -147,6 +177,61 @@ describe('reinicio', () => {
 
     expect(sup.estado).toBe('restarting')
     expect(estados.at(-1)?.[1]).toContain('servidor')
+  })
+
+  it('state failed lido DEPOIS do exit ainda vence', async () => {
+    // Python writes `state: failed` (revoked) right before `sys.exit(1)`, and
+    // Node may fire `exit` before reading that last line. Deciding on `exit`
+    // took the "restart requested by the server" branch (draining + code 1)
+    // and respawned a revoked executor every 2 s.
+    const { sup, procs, spawnFn } = criar()
+    sup.start()
+    const proc = procs[0]!
+    proc.emitir({ v: 1, t: 'hello', ts: 1, data: {} })
+    proc.emitir({ v: 1, t: 'state', ts: 2, data: { phase: 'draining', step: null, detail: null } })
+    await tick()
+
+    proc.emit('exit', 1, null)
+    proc.emitir({ v: 1, t: 'state', ts: 3, data: { phase: 'failed', step: 'revoked', detail: 'revogado' } })
+    await tick()
+    proc.emit('close', 1, null)
+    await tick()
+    await vi.advanceTimersByTimeAsync(120_000)
+
+    expect(sup.estado).toBe('failed')
+    expect(spawnFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('state failed cancela um restart que já estava no backoff', async () => {
+    const { sup, procs, spawnFn } = criar()
+    sup.start()
+    procs[0]!.sair(1)
+    await tick()
+    expect(sup.estado).toBe('restarting')
+
+    procs[0]!.emitir({ v: 1, t: 'state', ts: 1, data: { phase: 'failed', step: 'revoked', detail: null } })
+    await tick()
+    await vi.advanceTimersByTimeAsync(120_000)
+
+    expect(sup.estado).toBe('failed')
+    expect(spawnFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('exit sem close finaliza depois de uma espera curta', async () => {
+    // A grandchild that inherited the pipes keeps them open after Python died;
+    // waiting for `close` forever would leave the supervisor in `running` with
+    // no executor.
+    const { sup, procs } = criar()
+    sup.start()
+    procs[0]!.emit('exit', 1, null)
+    await tick()
+    expect(sup.estado).toBe('starting')
+
+    await vi.advanceTimersByTimeAsync(2_500)
+    expect(sup.estado).toBe('restarting')
+    procs[0]!.emit('close', 1, null)   // late: must not finalize twice
+    await tick()
+    expect(sup.estado).toBe('restarting')
   })
 
   it('state failed interrompe o retry', async () => {
@@ -248,6 +333,33 @@ describe('stop', () => {
     await p
   })
 
+  it('"Forçar agora" durante o backoff para de vez, e não fica em restarting', async () => {
+    // The draining alert outlived the process into the restart backoff; its
+    // "Forçar agora" found no process to kill and changed nothing, leaving the
+    // supervisor in `restarting` with no timer — and no way out in the panel.
+    const { sup, procs, spawnFn } = criar()
+    sup.start()
+    procs[0]!.emitir({ v: 1, t: 'state', ts: 1, data: { phase: 'draining', step: null, detail: null } })
+    await tick()
+    procs[0]!.sair(1)
+    await tick()
+    expect(sup.estado).toBe('restarting')
+
+    sup.forcar()
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(sup.estado).toBe('stopped')
+    expect(spawnFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('"Forçar agora" sem processo não apaga um failed', async () => {
+    const { sup, procs } = criar()
+    sup.start()
+    procs[0]!.emit('error', new Error('ENOENT'))
+    await tick()
+    sup.forcar()
+    expect(sup.estado).toBe('failed')
+  })
+
   it('forca o encerramento quando o teto de graca estoura', async () => {
     const { sup, procs } = criar()
     sup.start()
@@ -319,6 +431,24 @@ describe('comandos', () => {
   it('devolve false sem processo', () => {
     const { sup } = criar()
     expect(sup.enviar({ cmd: 'ping' })).toBe(false)
+  })
+
+  it('pipe quebrado vira linha de log, e não exceção no main', async () => {
+    // A command written while Python is exiting fails ASYNCHRONOUSLY (EPIPE),
+    // as an 'error' on stdin — out of reach of the try/catch. Unhandled, it
+    // was an uncaught exception in the main process. vitest fails the run on
+    // an unhandled error, so getting here clean is part of the assertion.
+    const { sup, procs } = criar()
+    const linhas: string[] = []
+    sup.on('linha', (t) => linhas.push(t))
+    sup.start()
+    procs[0]!.stdin._transform = (_c, _e, cb) => cb(new Error('write EPIPE'))
+
+    expect(sup.enviar({ cmd: 'ping' })).toBe(true)
+    await tick()
+
+    expect(linhas.some((l) => l.includes('"ping"') && l.includes('EPIPE'))).toBe(true)
+    expect(linhas.some((l) => l.includes('stdin do executor') && l.includes('EPIPE'))).toBe(true)
   })
 })
 

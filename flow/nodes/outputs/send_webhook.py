@@ -19,6 +19,8 @@ class SendWebhookNode(BaseNode):
     included in the payload. Includes SSRF protection.
     """
 
+    TEM_EFEITO_COLATERAL = True
+
     @classmethod
     def description(cls) -> Dict[str, Any]:
         return {

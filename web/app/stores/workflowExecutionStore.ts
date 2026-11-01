@@ -406,6 +406,10 @@ interface WorkflowExecutionActions {
    *  had been discarded along the way. */
   registrarDescartados(quantidade: number): void
   clearEvents(): void
+  /** Clears the log the server is about to replay on a reconnect, KEEPING what
+   *  the replay may no longer carry: the run's start and the sub-workflow
+   *  groups (the server keeps only the last 5000 events). */
+  restartLogForReplay(): void
   loadHistoricalEvents(runId: string, events: RunEvent[]): void
 }
 
@@ -618,6 +622,10 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
 
   clearEvents: () => {
     set({ events: [], droppedEvents: 0, runStartedTs: null, subflowRoots: new Set(), eventSeq: 0, runOutcome: null })
+  },
+
+  restartLogForReplay: () => {
+    set({ events: [], droppedEvents: 0, eventSeq: 0, runOutcome: null })
   },
 
   loadHistoricalEvents: (runId, events) => {

@@ -26,6 +26,14 @@ def _req(auth=None):
     return r
 
 
+@pytest.fixture(autouse=True)
+def _sessao_nao_revogada():
+    """These tests are about the portal's gate, not about a password reset:
+    the session-revocation check (Redis) answers "not revoked"."""
+    with patch("app.core.utils.jwt_utils.session_revoked", new=AsyncMock(return_value=False)):
+        yield
+
+
 # ── enforce_portal_access: o gate ────────────────────────────────────────────
 
 @pytest.mark.asyncio

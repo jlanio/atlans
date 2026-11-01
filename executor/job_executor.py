@@ -76,6 +76,32 @@ _VALIDATION_LOCK = threading.Lock()
 _CONTROL_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="atlas-ctrl")
 
 
+# Mark left on a message by `validar_na_chegada`. A private object, not a JSON
+# value: a frame from the network can never carry it, so a forged message cannot
+# claim to have been validated already.
+_VALIDADO = object()
+_CHAVE_DE_VALIDACAO = "_validado_na_chegada"
+
+
+def validar_na_chegada(message: dict) -> None:
+    """Signature, recipient, deadline and nonce, checked when the job ARRIVES.
+
+    The server sends jobs to wait in this executor's local queue when every
+    slot is busy (see `_sort_key` in workflow_execution_service). Checking the
+    deadline only when a worker picked the job made a job that waited more
+    than the envelope's validity (5 min + 5 min of tolerance) fail as "expired"
+    — or as "fix the NTP of this host" after 15 min — without ever running.
+    The envelope's validity is about the trip, not about the queue: it is
+    checked on arrival, and execution only decrypts.
+
+    Runs in a thread (the control pool) like the rest of the validation.
+    """
+    message.pop(_CHAVE_DE_VALIDACAO, None)
+    with _VALIDATION_LOCK:
+        validate_job(message)
+    message[_CHAVE_DE_VALIDACAO] = _VALIDADO
+
+
 def _validar_e_descriptografar(message: dict) -> dict:
     """Ed25519 signature + anti-replay + decryption, off the event loop.
 
@@ -87,8 +113,11 @@ def _validar_e_descriptografar(message: dict) -> dict:
     bursts, the pauses added up ahead of the heartbeat and of the events of the
     jobs already in progress.
     """
-    with _VALIDATION_LOCK:
-        validate_job(message)
+    if message.get(_CHAVE_DE_VALIDACAO) is not _VALIDADO:
+        # A message that did not go through `validar_na_chegada` (another
+        # caller, a test) is validated here, as before.
+        with _VALIDATION_LOCK:
+            validate_job(message)
     if _agent_private_key is None:
         raise RuntimeError("Chave privada não inicializada. Chame init_private_key() no startup.")
     return decrypt_job_payload(message, _agent_private_key)

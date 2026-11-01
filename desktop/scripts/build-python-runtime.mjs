@@ -18,11 +18,12 @@
 //    and producing a bundle that only works on it.
 //
 //   node scripts/build-python-runtime.mjs [--no-prune] [--no-compile]
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import {
   DESKTOP, LOCK, PY_DIR, PY_EXE, RESOURCES, assertRuntimeExists, dirSize, fail,
-  log, mb, ok, python, pythonCapture, readRuntimeSpec, rmrf, step, tarExtract, walk,
+  log, mb, ok, python, pythonCapture, pythonEnv, readRuntimeSpec, rmrf, step, tarExtract, walk,
 } from './lib.mjs'
 
 const noPrune    = process.argv.includes('--no-prune')
@@ -178,10 +179,19 @@ if (noCompile) {
 } else {
   step('Pre-compilando (.pyc)')
   measure('compileall', () => {
-    // -q silences; a syntax error in an isolated module (there are several in
-    // the stdlib for future versions) must not bring down the build — hence the
-    // ignored exit code.
-    python(['-m', 'compileall', '-q', '-j', '0', path.join(PY_DIR, 'Lib')], { stdio: 'ignore' })
+    // -q leaves only the errors. A syntax error in an isolated module (a py2
+    // leftover in some wheel, a sample for a future Python) must not bring
+    // down the build: compileall keeps going and compiles everything else, but
+    // exits 1. So spawnSync directly, and not `python()` — which calls `fail()`
+    // on any non-zero exit — with the output on the console, where the
+    // offending file is named.
+    const r = spawnSync(PY_EXE, ['-m', 'compileall', '-q', '-j', '0', path.join(PY_DIR, 'Lib')], {
+      env: pythonEnv(), stdio: ['ignore', 'inherit', 'inherit'],
+    })
+    if (r.error) fail(`falha ao executar compileall: ${r.error.message}`)
+    if (r.status !== 0) {
+      log(`  AVISO: compileall saiu com codigo ${r.status} — os arquivos citados acima ficam sem .pyc; o resto foi compilado`)
+    }
   })
 }
 

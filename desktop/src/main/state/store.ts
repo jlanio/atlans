@@ -209,6 +209,13 @@ export class AppStore {
     if (estado === 'stopped' || estado === 'failed') {
       this.estado.snapshot = null
       this.estado.fase = estado === 'failed' ? 'failed' : null
+    } else if (estado === 'restarting' || estado === 'starting') {
+      // Same reason: the process those belonged to is gone. A leftover
+      // `fase: draining` kept the "Encerrando — Forçar agora" alert on screen
+      // through the restart backoff, offering to force a process that no
+      // longer existed.
+      this.estado.snapshot = null
+      this.estado.fase = null
     }
     this.estadoSujo = true
     this.agendar()

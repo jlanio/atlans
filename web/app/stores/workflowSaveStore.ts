@@ -32,6 +32,11 @@ interface WorkflowSaveState {
    *  previous workflow — and a save would write that over the server's
    *  definition. The creation screen is born `true`: there is nothing to load. */
   canvasHidratado: boolean
+  /** `id_hash` of the workflow whose graph the canvas was hydrated with; `null`
+   *  until a hydration (and on the creation screen). The save compares it with
+   *  the route id: the PUT is addressed by the route, so a canvas holding
+   *  another workflow's graph would write that graph over this one. */
+  canvasWorkflowId: string | null
   /** `definition_etag` of the definition the canvas is based on — the loaded
    *  one, then each save's. Sent back on the next save, which the server
    *  refuses (409) if someone else saved in between. `null` = not known (new
@@ -121,6 +126,7 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
     // Nothing is on the canvas until a workflow hydrates it (or the creation
     // screen opens) — the safe side for a flag that holds back saves.
     canvasHidratado: false,
+    canvasWorkflowId: null,
     definitionEtag: null,
     geracao: 0,
 

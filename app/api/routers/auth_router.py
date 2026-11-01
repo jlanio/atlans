@@ -4,9 +4,12 @@ Authentication endpoints — registration, login and JWT token renewal.
 
 Brute-force protection:
   - Rate limit per IP (slowapi): 10 req/min on login
-  - Lockout per username (Redis): 5 failed attempts → 15 min block
+  - Lockout per identifier typed AND per account (Redis): 5 failed attempts
+    → 15 min block
 """
 import asyncio
+import functools
+import secrets
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -26,6 +29,7 @@ from app.core.utils.jwt_utils import (
     create_access_token, create_refresh_token, decode_token,
     new_refresh_family, register_refresh_family,
     rotate_refresh_family, revoke_refresh_family, refresh_rate_exceeded,
+    revoke_user_sessions, session_opened_at, session_revoked,
 )
 from app.core.utils.logger import get_logger
 from app.core.rate_limiter import limiter
@@ -86,6 +90,29 @@ async def _record_failed(username: str, redis: aioredis.Redis) -> int:
 async def _clear_attempts(username: str, redis: aioredis.Redis) -> None:
     """Removes the counters after a successful login."""
     await redis.delete(f"login_failed:{username}", f"login_locked:{username}")
+
+
+def _account_bucket(user: User) -> str:
+    """Lockout bucket of the ACCOUNT. The identifier buckets are per string
+    typed, and username and email are two strings for the same account: alone
+    they gave 2 x _MAX_ATTEMPTS guesses. This one counts both together."""
+    return f"account:{user.id_hash}"
+
+
+@functools.lru_cache(maxsize=1)
+def _dummy_hash() -> str:
+    """A hash nobody knows the password of. Verified when the identifier
+    matches no user, so that answer costs the same bcrypt as a wrong password
+    (otherwise ~1 ms against ~250 ms tells which identifiers exist)."""
+    return hash_password(secrets.token_urlsafe(32))
+
+
+def _session_claims(user: User, family: str, fam_iat: int) -> dict:
+    """Claims shared by the access and the refresh token of one session."""
+    return {
+        "sub": user.id_hash, "username": user.username,
+        "family": family, "fam_iat": fam_iat,
+    }
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -182,13 +209,20 @@ async def login(
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
+    # The account's own bucket, whichever identifier was typed.
+    if user is not None:
+        await _check_lockout(_account_bucket(user), redis)
+
     # bcrypt off the event loop (see register): under a login burst, the hashes
-    # run in parallel instead of serializing and stalling the worker.
-    password_ok = bool(user) and await asyncio.to_thread(
-        verify_password, payload.password, user.hashed_password,
-    )
+    # run in parallel instead of serializing and stalling the worker. Without a
+    # user it runs anyway, against a hash no password matches (_dummy_hash).
+    hashed = user.hashed_password if user is not None else await asyncio.to_thread(_dummy_hash)
+    password_ok = await asyncio.to_thread(verify_password, payload.password, hashed)
+    password_ok = password_ok and user is not None
     if not password_ok:
         remaining = await _record_failed(ident, redis)
+        if user is not None:
+            remaining = min(remaining, await _record_failed(_account_bucket(user), redis))
         if remaining == 0:
             logger.warning("Conta '%s' bloqueada após %d tentativas falhas.", ident, _MAX_ATTEMPTS)
             raise HTTPException(
@@ -216,6 +250,7 @@ async def login(
 
     # 3. Successful login — clears counters and updates last access
     await _clear_attempts(ident, redis)
+    await _clear_attempts(_account_bucket(user), redis)
     user.last_login_at = func.now()
     await db.commit()
 
@@ -223,7 +258,7 @@ async def login(
     family, jti = new_refresh_family()
     await register_refresh_family(family, jti)
 
-    data = {"sub": user.id_hash, "username": user.username, "family": family}
+    data = _session_claims(user, family, session_opened_at())
     logger.info("Login do usuário '%s'.", user.username)
     return Token(
         access_token=create_access_token(data),
@@ -258,6 +293,11 @@ async def refresh_token(request: Request, payload: TokenRefresh, db: AsyncSessio
             detail="Muitas renovações de sessão em sequência. Tente novamente em instantes.",
         )
 
+    # A password reset after this session opened ends it here, family included.
+    if await session_revoked(claims):
+        await revoke_refresh_family(family)
+        raise HTTPException(status_code=401, detail="Refresh token inválido ou expirado.")
+
     # Rotates the token; detects reuse (jti already rotated = theft)
     rot_status, new_jti = await rotate_refresh_family(family, jti)
     if rot_status != "ok":
@@ -270,7 +310,12 @@ async def refresh_token(request: Request, payload: TokenRefresh, db: AsyncSessio
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Usuário não encontrado ou inativo.")
 
-    data = {"sub": user.id_hash, "username": user.username, "family": family}
+    # The session keeps the moment it was opened. A token from before the claim
+    # existed gets 0: older than any revocation, as it really is.
+    fam_iat = claims.get("fam_iat")
+    if not isinstance(fam_iat, int) or isinstance(fam_iat, bool):
+        fam_iat = 0
+    data = _session_claims(user, family, fam_iat)
     return Token(
         access_token=create_access_token(data),
         refresh_token=create_refresh_token({**data, "jti": new_jti}),
@@ -392,31 +437,58 @@ async def reset_password(
     from app.services.api_token_service import revoke_all_for_user
 
     await revoke_all_for_user(db, [user.id_hash], motivo="password_reset")
+    # Nor any browser session: every one opened before now stops at its next
+    # request or renewal. Recorded BEFORE the commit — if Redis fails, the
+    # password does not change either, instead of changing with the old
+    # sessions still alive.
+    await revoke_user_sessions(user.id_hash)
     await db.commit()
+    # Whoever proved they own the e-mail gets the login back: the account's
+    # lockout (and the identifiers' buckets) would otherwise keep them out for
+    # up to 15 minutes with the NEW password. Best-effort.
+    try:
+        from app.core.redis import get_redis_pool
+
+        r = get_redis_pool()
+        for balde in (_account_bucket(user), user.username.lower(), user.email.lower()):
+            await _clear_attempts(balde, r)
+    except Exception as exc:
+        logger.warning("Lockout de '%s' nao limpo apos a redefinicao: %s", user.username, exc)
     logger.info("Senha do usuário '%s' redefinida.", user.username)
     return MessageResponse(message="Senha redefinida com sucesso!")
 
 
 @router.post("/logout", response_model=MessageResponse, summary="Revogar token de acesso")
-async def logout(
-    request: Request,
-    current_user=Depends(get_current_user),
-):
-    """Revokes the access token (blacklist) and the session's refresh token family."""
-    from app.core.utils.jwt_utils import blacklist_token
+async def logout(request: Request):
+    """Revokes the access token (blacklist) and the session's refresh token family.
+
+    An EXPIRED access token is accepted here, as long as it is ours (signature
+    and audience checked): a tab left open past the 30 minutes still has to be
+    able to end the session — otherwise the refresh family stays alive for days
+    after the user clicked "Sair". Any other token is a 401, as before."""
+    import jwt as _jwt
+
+    from app.core.config import APP_SECRET
+    from app.core.utils.jwt_utils import AUDIENCE_ACCESS, blacklist_token
 
     auth = request.headers.get("Authorization", "")
-    if auth.startswith("Bearer "):
-        token = auth.removeprefix("Bearer ").strip()
-        await blacklist_token(token)
-        # Revokes the whole refresh token family (really ends the session).
-        # The access token carries the 'family' claim mirrored from the associated refresh.
-        try:
-            from app.core.utils.jwt_utils import AUDIENCE_ACCESS
-            family = decode_token(token, expected_audience=AUDIENCE_ACCESS).get("family")
-            if family:
-                await revoke_refresh_family(family)
-        except Exception:
-            # Token expired or invalid — the blacklist was already done above; OK.
-            pass
+    token = auth.removeprefix("Bearer ").strip() if auth.startswith("Bearer ") else ""
+    if not token:
+        raise HTTPException(status_code=401, detail="Token de autenticação não informado.")
+    try:
+        claims = _jwt.decode(
+            token, APP_SECRET, algorithms=["HS256"], audience=AUDIENCE_ACCESS,
+            options={"require": ["exp", "aud", "sub"], "verify_exp": False},
+        )
+    except _jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado.")
+    if claims.get("type") != "access":
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado.")
+
+    await blacklist_token(token)
+    # Revokes the whole refresh token family (really ends the session).
+    # The access token carries the 'family' claim mirrored from the associated refresh.
+    family = claims.get("family")
+    if family:
+        await revoke_refresh_family(family)
     return MessageResponse(message="Logout realizado com sucesso.")

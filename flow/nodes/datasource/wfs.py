@@ -761,6 +761,14 @@ def _fetch_wfs_features(
     return gdf
 
 
+def _fetch_with_validated_connections(*args, **kwargs):
+    """`_fetch_with_retry` with every connection of this thread validated."""
+    from flow.utils.conexao_validada import conexoes_validadas
+
+    with conexoes_validadas():
+        return _fetch_with_retry(*args, **kwargs)
+
+
 def _fetch_with_retry(
     url: str,
     type_name: str,
@@ -1014,9 +1022,11 @@ class WFSNode(BaseNode):
         # step-ca would be requested, and the error message would return the body to the
         # panel (blind SSRF -> partially blind). validate_url_ssrf resolves the
         # host and refuses internal/private/loopback/link-local/reserved IPs.
-        # Residual (follow-up): owslib does its own resolution and follows redirects,
-        # so a TOCTOU/DNS-rebinding window remains — the ideal is a transport
-        # with IP pinning in owslib. Runs in a thread: getaddrinfo would block the loop.
+        # owslib does its own resolution and follows redirects: the fetch below
+        # runs under `conexoes_validadas`, which re-checks the address of every
+        # connection (redirects and re-resolutions included). This first check
+        # stays for its clearer error before any request. Runs in a thread:
+        # getaddrinfo would block the loop.
         await asyncio.to_thread(validate_url_ssrf, url)
 
         # bbox: accepts it from the manual field OR from another node's input (e.g.: ComputeBoundingBox.bbox_string)
@@ -1043,7 +1053,7 @@ class WFSNode(BaseNode):
 
         try:
             gdf = await asyncio.to_thread(
-                _fetch_with_retry, url, type_name, max_features,
+                _fetch_with_validated_connections, url, type_name, max_features,
                 bbox, srs_name, sort_by, timeout, retries, _RETRY_DELAY, cql_filter,
                 auth=auth,
             )

@@ -24,6 +24,7 @@ Categories and retry semantics:
 logic uses to decide between re-dispatch and dead-letter.
 """
 import asyncio
+import socket
 
 # categoria → retryable
 _RETRYABLE = {
@@ -72,3 +73,33 @@ def classify_error(exc: BaseException) -> str:
     if has(ValueError, TypeError, KeyError, IndexError):
         return "user"
     return "internal"
+
+
+class RequestAlreadyDelivered(RuntimeError):
+    """A failure AFTER the request reached its destination — e.g. the
+    connection refused on a redirect hop, when the original POST was already
+    applied and answered with the 3xx. Whatever the cause in its chain says,
+    repeating the node would repeat the write."""
+
+
+def did_not_reach_the_destination(exc: BaseException) -> bool:
+    """True when the failure provably happened BEFORE anything was sent.
+
+    A refused connection, a name that does not resolve or a timeout while still
+    CONNECTING never delivered the request. A read timeout or a reset does not
+    say that: the remote side may have received and applied the write before
+    the answer was lost, so repeating it can duplicate rows, e-mails or
+    webhooks. Used to decide whether a node with side effects may be retried.
+    """
+    cadeia = list(_chain(exc))
+    if any(isinstance(e, RequestAlreadyDelivered) for e in cadeia):
+        return False
+    for e in cadeia:
+        if isinstance(e, (ConnectionRefusedError, socket.gaierror)):
+            return True
+        # httpx/httpcore raise ConnectError ("could not open the connection") and
+        # ConnectTimeout (the TCP/TLS handshake did not finish); matched by name
+        # so this module keeps no HTTP-client dependency.
+        if type(e).__name__ in ("ConnectError", "ConnectTimeout"):
+            return True
+    return False

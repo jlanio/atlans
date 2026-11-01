@@ -54,3 +54,17 @@ def test_executor_reuses_the_same_rule():
 
 def test_malformed_url_is_not_local():
     assert is_local_server("ws://[::1") is False
+
+
+@pytest.mark.parametrize("url", [
+    "wss://host.docker.internal",
+    "wss://localhost:8443",
+    "https://127.0.0.1",
+])
+def test_a_local_name_over_tls_keeps_verification_and_mtls(url):
+    # Asking for TLS means wanting it checked: only ws:// / http:// to a local
+    # name goes without it.
+    assert is_local_server(url) is False
+    with patch("executor.utils.build_mtls_ssl_context", return_value=_CTX):
+        _, _, verify = get_agent_http_config(url)
+    assert verify is _CTX

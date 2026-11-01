@@ -2,6 +2,7 @@ import asyncio
 import ctypes
 import io
 import os
+import re
 import sys
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -16,6 +17,9 @@ from flow.nodes.base import BaseNode
 from flow.registry import register_node
 from flow.utils.code_sandbox import (
     build_safe_builtins,
+    executando_codigo_do_usuario,
+    fora_do_codigo_do_usuario,
+    liberar_thread_do_script,
     validate_code_ast,
     UnsafeCodeError,
 )
@@ -252,6 +256,34 @@ class _LoggingStream(io.TextIOBase):
         self._flush_batch()
 
 
+_bibliotecas_aquecidas = False
+# A script that may pull matplotlib in (the Styler's gradients and bars use its
+# colormaps). Only those pay the import (~40 MB, ~1 s cold).
+_PEDE_MATPLOTLIB = re.compile(r"\b(matplotlib|style|plot|cmap|colormap|gradient)\b")
+
+
+def _aquecer_bibliotecas(code: str) -> None:
+    """Imports matplotlib OUTSIDE the user's code when the script may use it:
+    its first import creates the config/cache folder, which the runtime guard
+    refuses inside the script — `df.style.background_gradient()` failed for
+    reasons the script did not cause. Runs before the timed script thread (it
+    does not count against the timeout, and an interruption cannot leave it
+    half done); the flag is set only once it worked. Not installed → skipped."""
+    global _bibliotecas_aquecidas
+    if _bibliotecas_aquecidas or not _PEDE_MATPLOTLIB.search(code or ""):
+        return
+    try:
+        import matplotlib
+
+        matplotlib.get_cachedir()
+        matplotlib.get_configdir()
+    except ImportError:
+        pass
+    except Exception:  # noqa: BLE001 - a broken install must not stop the node
+        return
+    _bibliotecas_aquecidas = True
+
+
 def _run_script(
     code: str,
     namespace: Dict[str, Any],
@@ -262,12 +294,27 @@ def _run_script(
     Executes the Python script in the given namespace with restricted builtins.
     Redirects stdout so that print() appears in the UI terminal in real time.
     """
-    stream = _LoggingStream(log_fn, publish_fn)
+    # The platform's own work on this thread (publishing a batch of print()
+    # lines, logging) runs with the runtime guard suspended: it may use the
+    # event loop's socket or write a log file, which the user's code may not.
+    def _log_da_plataforma(msg: str) -> None:
+        with fora_do_codigo_do_usuario():
+            log_fn(msg)
+
+    def _publicacao_da_plataforma(linhas: List[str]) -> None:
+        with fora_do_codigo_do_usuario():
+            publish_fn(linhas)  # type: ignore[misc]
+
+    stream = _LoggingStream(
+        _log_da_plataforma, _publicacao_da_plataforma if publish_fn else None
+    )
     old_stdout = sys.stdout
     try:
         sys.stdout = stream  # type: ignore[assignment]
         namespace["__builtins__"] = _SAFE_BUILTINS
-        exec(compile(code, "<PythonScript>", "exec"), namespace)  # noqa: S102
+        codigo = compile(code, "<PythonScript>", "exec")
+        with executando_codigo_do_usuario():
+            exec(codigo, namespace)  # noqa: S102
     finally:
         # Restores stdout BEFORE the flush: if the timeout's asynchronous
         # interruption (_ScriptInterrupted) lands in this finally, the global
@@ -435,7 +482,13 @@ class PythonScript(BaseNode):
                 # interruption — the global stdout never stays stuck on the node's stream.
                 if sys.stdout is not stdout_before:
                     sys.stdout = stdout_before
+                # Same reason for the runtime guard's mark: an interruption
+                # landing inside the context manager's exit could leave this
+                # pool worker marked as running user code.
+                liberar_thread_do_script()
 
+        # On the node's own pool (never the default one the GIS nodes share).
+        await loop.run_in_executor(_SCRIPT_POOL, _aquecer_bibliotecas, code)
         future = loop.run_in_executor(_SCRIPT_POOL, _executar_script)
         # Do NOT use asyncio.wait_for: on timeout it tries to CANCEL the future and,
         # since the executor's thread is already running (not cancelable), WAITS for

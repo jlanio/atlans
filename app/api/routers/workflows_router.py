@@ -144,12 +144,23 @@ async def create_workflow(
         # Stamps the author on INSERT: without this `created_by_id`/`updated_by_id`
         # were born null and "criado há X por Y" (created X ago by Y) in the listing
         # never showed the name (the field was only filled on the first edit, via update_workflow).
+        # The other columns the body accepts. They were validated (the secret
+        # guard even ran on `params_schema`) and then silently dropped: a
+        # client creating with a description or parameters got a 201 and a
+        # workflow without them.
+        extras = {
+            campo: valor
+            for campo in ("description", "params_schema", "notification_url",
+                          "priority", "version", "flag_ative")
+            if (valor := getattr(payload, campo, None)) is not None
+        }
         wf = await service.create_workflow(
             payload.name,
             payload.definition,
             workspace_id=payload.workspace_id,
             created_by_id=current_user.id_hash,
             updated_by_id=current_user.id_hash,
+            **extras,
         )
         logger.info(f"Workflow '{payload.name}' criado por '{current_user.id_hash}'.")
         return {

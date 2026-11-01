@@ -17,6 +17,10 @@ x-api-env: &api-env
   TZ: ${TZ}
   DATABASE_URL: ${DATABASE_URL}
   REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+  # Compose interpolates the password into the URL verbatim; with it here too,
+  # the API percent-encodes a character reserved in URLs (/ ? # % @...) before
+  # using the URL (app/core/utils/url_do_redis.py).
+  REDIS_PASSWORD: ${REDIS_PASSWORD}
   # Per-IP rate limit counters (app/core/rate_limiter.py). Empty (default)
   # = the REDIS_URL above, and the limits apply to the whole API; `memory://`
   # goes back to each worker's memory (see docs/operations.md).
@@ -103,12 +107,19 @@ x-api-env: &api-env
   AGENDAMENTO_FUSO_PADRAO: ${AGENDAMENTO_FUSO_PADRAO:-}
   EMAIL_VERIFY_TOKEN_TTL: ${EMAIL_VERIFY_TOKEN_TTL:-1440}
   PASSWORD_RESET_TOKEN_TTL: ${PASSWORD_RESET_TOKEN_TTL:-30}
-  # Traefik network: trusted origin for X-Forwarded-Tls-Client-Cert-Info
-  # (executor mTLS identity) and X-Forwarded-For (rate limit key).
+  # Trusted origin for X-Forwarded-For (rate limit key): Traefik AND the web
+  # container, whose /terra proxy forwards the client's XFF to the API.
   # Not to be confused with EDGE_PROXIES (Cloudflare, which APPENDS the client
   # to XFF): it is not passed here on purpose — the app default is already the
   # Cloudflare list. See .env.example and app/core/trusted_proxy.py.
   TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.16.0.0/12}
+  # The only origin of X-Forwarded-Tls-Client-Cert-Info (the executor's mTLS
+  # identity): Traefik's fixed IP (TRAEFIK_IP, below in the traefik service),
+  # never a range — 172.16.0.0/12 covers every container on these networks,
+  # the web and MinIO included, and any of them could present the header.
+  # Without TRAEFIK_IP (installations from before it), TRUSTED_PROXIES as
+  # before; `make bootstrap` sets it when it creates proxy-net.
+  MTLS_PROXIES: ${MTLS_PROXIES:-${TRAEFIK_IP:-${TRUSTED_PROXIES:-172.16.0.0/12}}}
   # ── mTLS + step-ca + OTP de enrollment ───────────────────────────────────
   STEPCA_URL: ${STEPCA_URL:-https://step-ca:9000}
   STEPCA_PROVISIONER_NAME: ${STEPCA_PROVISIONER_NAME:-atlans-app}
@@ -121,16 +132,23 @@ x-api-env: &api-env
 x-api-volumes: &api-volumes
   - artifacts_data:/data/artifacts
 
-# Log driver for the API and the web: LOG_DRIVER in .env (default json-file,
-# which runs on any host). json-file deletes the log along with the container,
-# and the deploy recreates api-prod and web-prod: in production on a host with
-# systemd, `journald` keeps the log on the host after the deploy, with
-# journald's own disk ceiling, and `docker compose logs` keeps reading it
-# (direct query: `journalctl -t <tag>`). Without systemd-journald on the host
-# (Docker Desktop, for example), journald does not start.
-x-log-persistente: &log-persistente
-  driver: ${LOG_DRIVER:-json-file}
-
+# The log of every service except the API and the web: the block
+# `servicos-${LOG_SERVICOS:-rotacionado}` of docker-compose.logs.yml. By
+# default json-file WITH a ceiling — without max-size, json-file grows until
+# the disk fills (Traefik's, with the access log, fastest); LOG_MAX_SIZE x
+# LOG_MAX_FILE per container, 10m x 5. `LOG_SERVICOS=daemon` keeps the
+# daemon's own driver instead (a host that ships every log via daemon.json).
+#
+# api-prod and web-prod follow LOG_DRIVER instead (default json-file, which
+# runs on any host). json-file deletes the log along with the container, and
+# the deploy recreates those two: in production on a host with systemd,
+# `journald` keeps the log on the host after the deploy, with journald's own
+# disk ceiling, and `docker compose logs` keeps reading it (direct query:
+# `journalctl -t <tag>`). Without systemd-journald on the host (Docker
+# Desktop, for example), journald does not start. journald rejects the
+# max-size/max-file options json-file needs, so the options of each driver
+# live in docker-compose.logs.yml and the service picks its block by name
+# (`extends`, `api-${LOG_DRIVER}`).
 services:
 
   redis:
@@ -142,6 +160,9 @@ services:
     # (REDIS_IMAGE=redis:7-alpine) or switches starting from an empty volume.
     image: ${REDIS_IMAGE:-valkey/valkey:8-alpine}
     restart: unless-stopped
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     command: >
@@ -158,7 +179,9 @@ services:
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      # The password in REDISCLI_AUTH (read by redis-cli and valkey-cli), never
+      # in `-a`: on a command line it shows up in `ps`, on the host too.
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli --no-auth-warning ping | grep PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -186,6 +209,9 @@ services:
       # traefik-dev, published on the loopback (profile executor-local, below).
       # AGENTS_URL in .env still wins.
       AGENTS_URL: ${AGENTS_URL:-https://${EXECUTOR_LOCAL_HOST:-agents.localhost}:${EXECUTOR_LOCAL_PORT:-8443}}
+      # traefik-dev has no fixed IP (TRAEFIK_IP is production Traefik's): in dev
+      # the mTLS header keeps coming from the TRUSTED_PROXIES range.
+      MTLS_PROXIES: ${MTLS_PROXIES:-${TRUSTED_PROXIES:-172.16.0.0/12}}
     # A Postgres on the host itself is `host.docker.internal` in DATABASE_URL
     # (`localhost` inside the container is the container); on Linux the name
     # only exists with this extra_hosts, as in api-prod.
@@ -195,8 +221,13 @@ services:
       # SEC: bind on loopback only. Publishing on 0.0.0.0 exposed the API without
       # Traefik in front — that is, without the mTLS cert header strip, without
       # rate limiting and without TLS termination.
-      - "127.0.0.1:8000:8000"
+      # API_PORT is the HOST port (the one the browser uses, NEXT_PUBLIC_API_PORT
+      # below); in the container uvicorn always listens on 8000.
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     restart: unless-stopped
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     volumes:
       - .:/app
       - artifacts_data:/data/artifacts
@@ -207,8 +238,8 @@ services:
       - backend
       - dev-net
       # step-ca-dev and traefik-dev live here (profile executor-local). The
-      # range is inside TRUSTED_PROXIES, which is what lets the API accept the
-      # mTLS header from traefik-dev.
+      # range is inside MTLS_PROXIES (above), which is what lets the API accept
+      # the mTLS header from traefik-dev.
       - proxy-net
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ping')"]
@@ -281,7 +312,8 @@ services:
       TZ: ${TZ}
       AUTH_SECRET: ${AUTH_SECRET}
       API_INTERNA: ${API_INTERNA}
-      NEXT_PUBLIC_API_PORT: ${API_PORT}
+      # The port the BROWSER reaches the dev API on: the one published above.
+      NEXT_PUBLIC_API_PORT: ${API_PORT:-8000}
       CODIGO_FONTE_URL: ${CODIGO_FONTE_URL:-}
       # O nome que a tela mostra (barra lateral, entrada, aba). Vazio = Atlans.
       NOME_NA_TELA: ${NOME_NA_TELA:-}
@@ -291,6 +323,9 @@ services:
       - ./web:/app
       - /app/node_modules
     restart: unless-stopped
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     networks:
       - backend
       - dev-net
@@ -321,6 +356,9 @@ services:
     image: smallstep/step-ca:0.27.0
     profiles: ["executor-local"]
     restart: unless-stopped
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     environment:
       DOCKER_STEPCA_INIT_NAME: "Atlans Internal CA"
       DOCKER_STEPCA_INIT_DNS_NAMES: "step-ca,localhost"
@@ -350,6 +388,9 @@ services:
     image: traefik:v3.6
     profiles: ["executor-local"]
     restart: unless-stopped
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     depends_on:
       # The host certificate is issued before the CA starts: healthy means it exists.
       step-ca-dev:
@@ -413,6 +454,9 @@ services:
       context: .
       dockerfile: Dockerfile.executor
     restart: unless-stopped
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     depends_on:
       traefik-dev:
         condition: service_started
@@ -456,6 +500,9 @@ services:
       context: .
       dockerfile: Dockerfile.api
     restart: unless-stopped
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     depends_on:
       # Started first, the executor's image creates the shared volume with its
       # own user, the same uid as this one: otherwise it would be born root's.
@@ -493,6 +540,9 @@ services:
     image: smallstep/step-ca:0.27.0
     profiles: ["prod"]
     restart: unless-stopped
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     environment:
       DOCKER_STEPCA_INIT_NAME: "Atlans Internal CA"
       DOCKER_STEPCA_INIT_DNS_NAMES: "step-ca,localhost"
@@ -521,6 +571,9 @@ services:
     # on every daemon start, however it stopped; a `docker stop` still holds
     # until the next one.
     restart: always
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     ports:
       - "80:80"
       - "443:443"
@@ -550,7 +603,8 @@ services:
       # does not need to write to the CA folder.
       # See docs/operations.md, "Traefik dynamic configuration".
       - ./traefik-dynamic:/etc/traefik/dynamic:ro
-      # Traefik access log on the host (TRAEFIK_LOG_DIR; default ./logs/traefik).
+      # Only for an access log in a file (TRAEFIK_ACCESSLOG_FILEPATH, below):
+      # it lands in TRAEFIK_LOG_DIR on the host (default ./logs/traefik).
       - ${TRAEFIK_LOG_DIR:-./logs/traefik}:/var/log/traefik
       # Internal CA that signs the executors' certs — used to validate client certs in mTLS.
       # make bootstrap-stepca copies the intermediate.crt and the AGENTS_HOST cert to ./traefik/atlans-ca/.
@@ -594,7 +648,14 @@ services:
       - "--log.level=INFO"
       - "--api=false"
       - "--accesslog=true"
-      - "--accesslog.filepath=/var/log/traefik/access.log"
+      # The access log goes to the container's output by default, under the
+      # json-file rotation of the service (`docker compose logs traefik`).
+      # Written to /var/log/traefik/access.log it grew forever: Traefik does not
+      # rotate it. Whoever reads the file (fail2ban, goaccess) sets
+      # TRAEFIK_ACCESSLOG_FILEPATH=/var/log/traefik/access.log and rotates it
+      # on the host (logrotate + `docker compose kill -s USR1 traefik`, which
+      # makes Traefik reopen it; see docs/operations.md).
+      - "--accesslog.filepath=${TRAEFIK_ACCESSLOG_FILEPATH:-/dev/stdout}"
       - "--accesslog.bufferingsize=100"
       - "--accesslog.format=json"
       - "--accesslog.fields.defaultmode=keep"
@@ -622,7 +683,14 @@ services:
           cpus: "0.5"
           memory: 256M
     networks:
-      - proxy-net
+      proxy-net:
+        # TRAEFIK_IP: a fixed address inside proxy-net, the only one the API
+        # accepts the executors' mTLS identity header from (MTLS_PROXIES, in
+        # x-api-env). `make bootstrap` picks the last address of the range
+        # when it creates the network (a new installation); empty = an address
+        # Docker hands out, and the header is trusted from TRUSTED_PROXIES as
+        # before. It has to be inside PROXY_NET_SUBNET, or Traefik does not start.
+        ipv4_address: ${TRAEFIK_IP:-}
 
   api-prod:
     profiles: ["prod"]
@@ -673,10 +741,10 @@ services:
       # Required for the /executores/enroll and /executores/renew-cert endpoints.
       - step-ca-data:/etc/step-ca:ro
     restart: unless-stopped
-    logging:
-      <<: *log-persistente
-      options:
-        tag: atlans-api
+    # The log driver (LOG_DRIVER) and its options: docker-compose.logs.yml.
+    extends:
+      file: docker-compose.logs.yml
+      service: api-${LOG_DRIVER:-json-file}
     networks:
       - proxy-net
       - backend
@@ -825,17 +893,19 @@ services:
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_URL: ${AUTH_URL}
       AUTH_TRUST_HOST: "true"
-      API_INTERNA: http://api-prod:${API_PORT}
+      # The container's port, fixed by api-prod's command (and its Traefik
+      # service), not API_PORT: that one is the dev API's port on the host.
+      API_INTERNA: http://api-prod:8000
       # The link to this installation's source code (AGPL, section 13), on the
       # sign-in screen and in the account menu. Empty = no link.
       CODIGO_FONTE_URL: ${CODIGO_FONTE_URL:-}
       # O nome que a tela mostra (barra lateral, entrada, aba). Vazio = Atlans.
       NOME_NA_TELA: ${NOME_NA_TELA:-}
     restart: unless-stopped
-    logging:
-      <<: *log-persistente
-      options:
-        tag: atlans-web
+    # The log driver (LOG_DRIVER) and its options: docker-compose.logs.yml.
+    extends:
+      file: docker-compose.logs.yml
+      service: web-${LOG_DRIVER:-json-file}
     # 512M was not enough: on September 22 the kernel killed next-server at
     # 519 MB of RSS (cgroup OOM) and the site went down until Docker restarted
     # it. 1G leaves room for the runtime + SSR cache without reserving anything
@@ -887,6 +957,9 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    extends:
+      file: docker-compose.logs.yml
+      service: servicos-${LOG_SERVICOS:-rotacionado}
     # Artifact upload/download buffers can grow; 2GB covers the typical usage
     # of workflows with multiple medium-sized files in parallel.
     deploy:
@@ -915,8 +988,8 @@ networks:
     driver: bridge
     name: proxy-net   # nome fixo — sem prefixo do projeto (necessário para Traefik)
     # Fixed subnet: TRUSTED_PROXIES points to this range (it is where Traefik's
-    # requests to the API come from, and it is what authorizes the mTLS cert
-    # header). Without pinning it, a network recreation may get another range
+    # requests to the API come from), and Traefik's fixed IP (TRAEFIK_IP) lives
+    # in it. Without pinning it, a network recreation may get another range
     # from Docker and all executors start getting 401.
     # Only takes effect when the network is created — on an existing network
     # Docker ignores it.
@@ -946,9 +1019,8 @@ volumes:
   # `docker compose down -v` (which destroys compose-managed volumes). Manual
   # bootstrap:
   #   docker volume create step-ca-data
-  # Periodic backup recommended:
-  #   docker run --rm -v step-ca-data:/data -v $(pwd)/backups:/backup alpine \
-  #       tar czf /backup/step-ca-$(date +%F).tar.gz -C /data .
+  # Periodic backup recommended: `make backup-stepca` (scripts/backup-stepca.sh,
+  # archives 0600 in a 0700 backups/ — they hold the CA's keys and password).
   step-ca-data:
     external: true
 

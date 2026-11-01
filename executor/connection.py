@@ -132,7 +132,17 @@ _INVENTARIO_MAX = 1000
 # result key (TTL 300 s) already protects it. Short on purpose:
 # on a busy executor the sent ones must not fill the whole inventory.
 _SENT_TTL_S = 90.0
+_PING_INTERVAL_S = 30.0
+_PING_TIMEOUT_S = 120.0
 _SENT_MAX = 2000
+# SUCCESSES sent recently, kept WHOLE (stats included) in memory — never on
+# disk, where the outbox keeps only a stripped copy. A half-open socket loses
+# a success silently; the next session of the same process resends it, so the
+# run closes as the success it was (artifacts and metrics registered) instead
+# of a "lost" failure whose retry would repeat its side effects.
+_SUCESSOS_JANELA_S = 20 * 60
+_SUCESSOS_MAX = 50
+_STATUS_DE_SUCESSO = ("success", "ok", "completed")
 # Reason of the 'cancelled' result of a job the executor did not have when the
 # cancellation arrived (see `_close_unknown_cancellation`).
 _UNKNOWN_CANCELLATION_REASON = (
@@ -347,6 +357,11 @@ class ExecutorConnection:
         self._session_started_at: float | None = None
         # job_id -> instant the result was sent; see `_remember_sent`.
         self._sent: dict[str, float] = {}
+        # job_id -> (monotonic instant of the FIRST send, the whole result)
+        self._sucessos_enviados: dict[str, tuple[float, dict]] = {}
+        # Sessions opened by this process: from the second on, the results the
+        # previous one sent are replayed (see _reenviar_resultados_recentes).
+        self._sessoes = 0
 
     async def push_capacity(self) -> None:
         """Sends a capacity report NOW, outside the `_capacity_loop` tick.
@@ -421,6 +436,27 @@ class ExecutorConnection:
 
                 msg, include_tb, terminal = _classify_connection_error(exc)
 
+                if terminal and await self._retomar_renovacao_interrompida():
+                    # The refusal came from a renewal whose answer was lost: the
+                    # server had already swapped the serial. The resumed renewal
+                    # got the new certificate; reconnect with it.
+                    logger.warning("Certificado renovado — reconectando.")
+                    delay = 1
+                    continue
+                if terminal and self._ha_renovacao_pendente():
+                    # The resume failed for a passing reason (network, server
+                    # restarting) while the saved renewal is still valid: one
+                    # quick attempt and then stopping for good left the machine
+                    # unable to connect until a manual re-enrollment. Keep
+                    # trying with backoff until it works or the saved renewal
+                    # expires — only then is the refusal final.
+                    logger.warning(
+                        "Renovacao pendente ainda nao concluida — nova tentativa em %ss.", delay,
+                    )
+                    rescheduled = await self._esperar_retry(delay)
+                    delay = 1 if rescheduled else min(delay * 2, config.RECONNECT_MAX_DELAY)
+                    continue
+
                 if terminal:
                     # 401/403/404 from the server = authoritative deny (revoked cert,
                     # executor removed, id not found). Reconnecting in a loop
@@ -442,6 +478,25 @@ class ExecutorConnection:
                 self._stats.on_disconnected(next_retry_s=actual)
                 rescheduled = await self._esperar_retry(actual)
                 delay = 1 if rescheduled else min(delay * 2, config.RECONNECT_MAX_DELAY)
+
+    @staticmethod
+    def _ha_renovacao_pendente() -> bool:
+        from executor import renewal
+        try:
+            return renewal.has_pending_renewal(config.EXECUTOR_CERT_DIR)
+        except Exception:
+            return False
+
+    async def _retomar_renovacao_interrompida(self) -> bool:
+        """Resumes a renewal whose answer was lost, if there is one. Best-effort."""
+        from executor import renewal
+        try:
+            if not renewal.has_pending_renewal(config.EXECUTOR_CERT_DIR):
+                return False
+            return await renewal.maybe_renew(config.SERVER_URL, config.EXECUTOR_CERT_DIR)
+        except Exception as exc:
+            logger.warning("Retomada da renovacao falhou: %s", exc)
+            return False
 
     async def _esperar_retry(self, segundos: float) -> bool:
         """Sleeps until the next attempt, but wakes up if someone asks for it now.
@@ -521,10 +576,15 @@ class ExecutorConnection:
             ssl_ctx = build_mtls_ssl_context()
         async with websockets.connect(
             ws_url,
-            # The application heartbeat (30s) is the source of truth. Native WS ping
-            # was forcing a close at 10s when behind a proxy/Traefik with
-            # latency — disabled to keep the pre-change behavior.
-            ping_interval=None,
+            # Client-side liveness. Without it nothing here noticed a half-open
+            # connection (NAT drop, a laptop that slept, a proxy that died): the
+            # sends kept "succeeding" into the kernel buffer for ~15 min while
+            # the server had already failed the runs. The old native ping was
+            # disabled because the library's 20 s pong deadline closed sessions
+            # behind a slow proxy; the deadline here is generous (the server
+            # itself pings every 60 s and tolerates 600 s).
+            ping_interval=_PING_INTERVAL_S,
+            ping_timeout=_PING_TIMEOUT_S,
             close_timeout=10,
             ssl=ssl_ctx,
             max_size=_MAX_WS_PAYLOAD,  # matches uvicorn's ws_max_size
@@ -552,6 +612,11 @@ class ExecutorConnection:
                 **({"system_info": sys_info} if sys_info else {}),
             }))
 
+            # A session after the first: what the previous one "sent" may never
+            # have reached the server (half-open connection). Resend it; the
+            # server keeps the first outcome and drops duplicates.
+            self._sessoes += 1
+
             # Starts parallel work as Tasks to allow cancellation
             tasks: list[asyncio.Task] = [
                 asyncio.create_task(self._heartbeat_loop(ws),     name="heartbeat"),
@@ -562,6 +627,13 @@ class ExecutorConnection:
             ]
             if self._events is not None:
                 tasks.append(asyncio.create_task(self._event_sender_loop(ws), name="events"))
+            # Outside `tasks`: it ENDS on its own, and the FIRST_COMPLETED below
+            # would take that for the session ending. Started after the loops, so
+            # it never delays them.
+            reenvio = (
+                asyncio.create_task(self._reenviar_resultados_recentes(), name="reenvio")
+                if self._sessoes > 1 else None
+            )
 
             # Waits for the FIRST task to finish — normally _receive_loop when the
             # server closes the connection. Cancelling the others immediately lets the
@@ -578,10 +650,12 @@ class ExecutorConnection:
                 # window was taken out and discarded (ws closed). Cancelling here is
                 # what makes main.py's "ORDERLY shutdown" label hold for
                 # the connection's children.
+                if reenvio is not None and not reenvio.done():
+                    reenvio.cancel()
                 for task in tasks:
                     if not task.done():
                         task.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
+                await asyncio.gather(*tasks, *([reenvio] if reenvio else []), return_exceptions=True)
                 # SessionMaker acabou: sem socket ate a proxima conexao.
                 self._ws = None
 
@@ -655,6 +729,12 @@ class ExecutorConnection:
                     # server or the operator step in before it piles up
                     # until the server fires close 1003.
                     await asyncio.sleep(_CLIENT_JSON_BACKOFF_SLEEP)
+                continue
+
+            if not isinstance(msg, dict):
+                # Valid JSON that is not an object (`[]`, `"x"`, `null`):
+                # `msg.get` would raise and take the whole session down.
+                logger.warning("Mensagem do servidor ignorada: não é um objeto JSON (%r).", raw[:200])
                 continue
 
             msg_type = msg.get("type")
@@ -773,6 +853,30 @@ class ExecutorConnection:
             logger.info("Job '%.8s' descartado: foi cancelado antes de chegar.", job_id)
             return
 
+        # Security validation on ARRIVAL (signature, recipient, deadline,
+        # nonce): a job may wait in the local queue longer than the envelope's
+        # validity, and the deadline is about the trip, not the queue. Runs in
+        # the control pool, off the loop. A refused job never enters the queue.
+        from executor.job_executor import _CONTROL_POOL, validar_na_chegada
+        from executor.job_validator import JobValidationError
+        try:
+            await asyncio.get_running_loop().run_in_executor(
+                _CONTROL_POOL, validar_na_chegada, message
+            )
+        except JobValidationError as exc:
+            logger.error("Job '%s' reprovado na validação de segurança: %s", job_id, exc)
+            await ws.send(json.dumps({
+                "type":           "job_result",
+                "job_id":         job_id,
+                "run_id":         job_id,
+                "status":         "error",
+                "error":          str(exc),
+                "error_category": "validation",
+                "retryable":      False,
+                "stats":          {},
+            }))
+            return
+
         if self._queue.is_full():
             # Tells the server it cannot accept
             await ws.send(json.dumps({
@@ -816,7 +920,8 @@ class ExecutorConnection:
             try:
                 self._drive_events.put_nowait(msg)
                 action = msg.get("action", "?")
-                fname = msg.get("file", {}).get("original_name", "?")
+                arquivo = msg.get("file")
+                fname = arquivo.get("original_name", "?") if isinstance(arquivo, dict) else "?"
                 logger.info("Drive event recebido: %s → %s", action, fname)
             except asyncio.QueueFull:
                 logger.warning("Fila de drive_events cheia — evento descartado.")
@@ -923,7 +1028,66 @@ class ExecutorConnection:
             if sent_ok:
                 enviado = str(result.get("job_id") or "")
                 self._remember_sent(enviado)
+                self._lembrar_sucesso(enviado, result)
                 result_store.mark_sent(enviado)
+
+    # Room the replay leaves in the result queue for the jobs running NOW: they
+    # use put_nowait and are DROPPED on a full queue (the same reserve as the
+    # boot replay in main.py).
+    _REENVIO_RESERVA = 8
+    # Pace of the replay: the server caps results per second per executor, and a
+    # live result arriving in a burst of replays could be refused with them.
+    _REENVIO_INTERVALO_S = 0.05
+
+    async def _reenviar_resultados_recentes(self) -> None:
+        """Puts back in the queue the FAILED/CANCELLED results sent within the
+        outbox's replay window (see result_store.JANELA_DE_REENVIO_S). Best-effort.
+
+        Only those: the outbox keeps a stripped result (no `stats`), so a
+        replayed SUCCESS would close the run as success with its artifacts and
+        metrics unregistered — worse than the server closing it as lost
+        (failed, retryable), which the user sees. An error or a cancellation
+        carries everything the server reads.
+
+        Paced and bounded like the boot replay: the queue keeps room for live
+        results, and the replays do not go out in one burst.
+        """
+        from executor import result_store
+        try:
+            # Synchronous on purpose: SQLite by key costs microseconds, and
+            # `to_thread` waits for the pool the GIS nodes may be filling.
+            recentes = result_store.load_recently_sent()
+        except Exception as exc:
+            logger.debug("Reenvio de resultados recentes ignorado: %s", exc)
+            return
+        na_fila = {
+            str(item.get("job_id"))
+            for item in list(getattr(self._results, "_queue", ()) or ())
+            if isinstance(item, dict)
+        }
+        # The outbox's failures/cancellations (complete as stored), then the
+        # successes kept whole in memory (the outbox's stripped copy of a
+        # success would close the run without its artifacts).
+        self._podar_sucessos()
+        candidatos = [r for r in recentes if r.get("status") not in _STATUS_DE_SUCESSO]
+        candidatos += [dict(r) for _quando, r in list(self._sucessos_enviados.values())]
+        reenviados = 0
+        for resultado in candidatos:
+            if str(resultado.get("job_id")) in na_fila:
+                continue
+            while self._results.qsize() >= self._REENVIO_RESERVA:
+                await asyncio.sleep(0.2)
+            try:
+                self._results.put_nowait(resultado)
+            except asyncio.QueueFull:
+                break
+            reenviados += 1
+            await asyncio.sleep(self._REENVIO_INTERVALO_S)
+        if reenviados:
+            logger.info(
+                "Reenviados %d resultado(s) da sessão anterior "
+                "(a conexão pode ter caído antes de o servidor recebê-los).", reenviados,
+            )
 
     def _requeue_result(self, result: dict, attempts: int = 0) -> None:
         """Puts an unsent result back in the queue without ever blocking.
@@ -1214,6 +1378,23 @@ class ExecutorConnection:
                     break
             await asyncio.sleep(_INVENTORY_INTERVAL)
 
+    def _lembrar_sucesso(self, job_id: str, result: dict) -> None:
+        """Keeps the whole result of a sent success for the replay window (see
+        `_SUCESSOS_JANELA_S`). A resend keeps the FIRST instant: the window
+        does not restart on every reconnect."""
+        if not job_id or result.get("status") not in _STATUS_DE_SUCESSO:
+            return
+        if job_id not in self._sucessos_enviados:
+            self._sucessos_enviados[job_id] = (time.monotonic(), result)
+        self._podar_sucessos()
+
+    def _podar_sucessos(self) -> None:
+        vence = time.monotonic() - _SUCESSOS_JANELA_S
+        for job_id in [j for j, (quando, _r) in self._sucessos_enviados.items() if quando < vence]:
+            del self._sucessos_enviados[job_id]
+        while len(self._sucessos_enviados) > _SUCESSOS_MAX:
+            self._sucessos_enviados.pop(next(iter(self._sucessos_enviados)))
+
     def _remember_sent(self, job_id: str) -> None:
         """Keeps for a few minutes the id of a result that has just gone out.
 
@@ -1264,7 +1445,10 @@ class ExecutorConnection:
         pendentes = self._pending_results()
         if pendentes is None:
             return None
-        return pendentes | set(self._recently_sent())
+        # The successes kept for the replay are still "on their way": the
+        # server must not close them as lost before the resend arrives.
+        self._podar_sucessos()
+        return pendentes | set(self._recently_sent()) | set(self._sucessos_enviados)
 
     def _build_inventory(self) -> dict:
         ativos = self._queue.active_job_ids() if self._queue is not None else []

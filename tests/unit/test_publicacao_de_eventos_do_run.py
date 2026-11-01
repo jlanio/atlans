@@ -107,6 +107,9 @@ async def test_publish_completion_omits_duration_ms_and_stamps_a_single_instant(
         })
         for run_id in ("r-1", "r-2")
     ]
+    # A failed/cancelled closing also releases a synchronous webhook waiting on
+    # the run (the job_result path already did): one response per run, 5 min.
+    resposta = json.dumps({"job_status": "failed", "error": "Executor desconectou.", "response": None})
     assert bloco == [
         cmd
         for run_id, ev in (("r-1", eventos[0]), ("r-2", eventos[1]))
@@ -115,6 +118,8 @@ async def test_publish_completion_omits_duration_ms_and_stamps_a_single_instant(
             ("ltrim", f"workflow:{run_id}:history", -MAX_EVENTS_IN_HISTORY, -1),
             ("expire", f"workflow:{run_id}:history", REDIS_TTL_1H),
             ("publish", f"workflow:{run_id}:events", ev),
+            ("lpush", f"webhook_response:{run_id}", resposta),
+            ("expire", f"webhook_response:{run_id}", 300),
         )
     ]
 
@@ -253,7 +258,9 @@ async def test_all_writers_use_the_owner_keys(monkeypatch, marked_keys):
     await RES._close_inconclusive_run("ex-1", "r-inc", "teste")
     await run_events_service.publicar_conclusao(["r-pc"], status="failed", mensagem="x")
 
-    usadas = _used_keys(rc) - {"webhook_response:r-inc"}
+    # The synchronous-webhook response is keyed by run_id on purpose (the waiter
+    # reads it by run_id), on every path that closes a run.
+    usadas = _used_keys(rc) - {"webhook_response:r-inc", "webhook_response:r-pc"}
     assert usadas == {
         f"{prefixo}<{run_id}>"
         for run_id in ("r-ne", "r-jr", "r-inc", "r-pc")

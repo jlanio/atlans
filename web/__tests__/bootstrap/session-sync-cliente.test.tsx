@@ -12,8 +12,9 @@ import type { ReactNode } from "react"
 import { renderToString } from "react-dom/server"
 
 const { setAuthToken } = vi.hoisted(() => ({ setAuthToken: vi.fn() }))
-const { sessionAtual } = vi.hoisted(() => ({
+const { sessionAtual, provedor } = vi.hoisted(() => ({
   sessionAtual: { valor: null as unknown },
+  provedor: { props: null as Record<string, unknown> | null },
 }))
 
 vi.mock("@/service/GisFlowService", () => ({
@@ -25,12 +26,15 @@ vi.mock("@/context/NotificationsContext", () => ({
 }))
 vi.mock("@/app/components/command-palette", () => ({ default: () => null }))
 vi.mock("next-auth/react", () => ({
-  SessionProvider: ({ children }: { children?: ReactNode }) => children ?? null,
+  SessionProvider: (props: { children?: ReactNode }) => {
+    provedor.props = props
+    return props.children ?? null
+  },
   signOut: vi.fn(),
   useSession: () => ({ data: sessionAtual.valor, status: "authenticated" }),
 }))
 
-import { SessionSync } from "@/app/components/providers"
+import Providers, { SessionSync } from "@/app/components/providers"
 
 describe("SessionSync no cliente", () => {
   it("escreve o token durante o render, antes de qualquer efeito", () => {
@@ -50,5 +54,21 @@ describe("SessionSync no cliente", () => {
     renderToString(<SessionSync />)
 
     expect(setAuthToken).toHaveBeenCalledWith(null)
+  })
+})
+
+describe("Providers: a sessão do cliente não vira anônima por um fetch que falhou", () => {
+  it("não refaz a sessão por intervalo (um poll que falha deixa a aba anônima)", () => {
+    // In next-auth 5 one failed /api/auth/session sets the session to null and
+    // stops refetching. The run socket fetches its own fresh token before a
+    // reconnect, so no periodic poll is needed.
+    provedor.props = null
+    renderToString(<Providers session={null}>{null}</Providers>)
+    // Written by the SessionProvider double during the render above.
+    const props = provedor.props as Record<string, unknown> | null
+
+    expect(props?.refetchInterval).toBeUndefined()
+    // The focus refetch stays on (next-auth's default).
+    expect(props?.refetchOnWindowFocus).not.toBe(false)
   })
 })

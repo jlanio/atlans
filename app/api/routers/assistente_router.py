@@ -500,6 +500,9 @@ async def _stream_confirmation(
             final_transcript = list(transcrito)
 
             if decisao == "confirmar":
+                # The URLs this click approved stay approved for the person:
+                # re-running the workflow does not ask again.
+                await agente.aprovar_urls(redis, escopo.user_id, guardado.get("urls_aprovaveis"))
                 # Executes the STORED args, through the same path as the loop and under
                 # the assistant's scope — never the args the client sent in the click.
                 fila: list[assistente.Evento] = []

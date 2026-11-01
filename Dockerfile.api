@@ -75,4 +75,7 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--ws", "websockets", "--ws-max-size", "16777216"]
+# Production-safe default: docker-compose.yml replaces it (dev adds --reload
+# on the bind-mounted code; api-prod sets the workers), but whoever runs the
+# image as is gets no file watcher restarting the API.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--ws", "websockets", "--ws-max-size", "16777216"]

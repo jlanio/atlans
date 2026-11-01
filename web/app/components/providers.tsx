@@ -52,6 +52,15 @@ export function SessionSync() {
   return null;
 }
 
+// No `refetchInterval` on purpose. A periodic refetch kept the browser's copy of
+// the access token fresh, but in next-auth 5 a single failed /api/auth/session
+// (offline, a laptop waking up) sets the session to null and stops refetching:
+// the tab turned anonymous — the Home aborted the assistant, the workspace list
+// emptied — until a reload. The only consumer of the browser's token is the run
+// WebSocket, and it fetches a fresh one itself before reconnecting
+// (`refreshAccessToken` in useExecuteWorkflow); HTTP goes through /terra, which
+// uses the middleware's copy.
+
 /**
  * `session` comes resolved from the server — in practice, from the MIDDLEWARE,
  * passed to the dashboard layout via header (see SESSION_HEADER in auth.ts).

@@ -421,8 +421,15 @@ async def test_every_write_tool_starts_confirmable():
     `ESCRITAS_SEM_CLIQUE` on purpose.
     """
     escritas = {nome for nome, g in GUARDAS.items() if not g.read_only}
-    livres = escritas - ag.CONFIRMAVEIS_SEMPRE - ag.CONFIRMAVEIS_SE_FLUXO_DA_PESSOA
+    livres = (
+        escritas - ag.CONFIRMAVEIS_SEMPRE - ag.CONFIRMAVEIS_SE_FLUXO_DA_PESSOA
+        - ag.CONFIRMAVEIS_SE_O_FLUXO_AGE
+    )
     assert livres == ag.ESCRITAS_SEM_CLIQUE
+    # `create_workflow` left the free list: it is free only while the definition
+    # does not act outside.
+    assert "create_workflow" not in ag.ESCRITAS_SEM_CLIQUE
+    assert "create_workflow" in ag.CONFIRMAVEIS_SE_O_FLUXO_AGE
     # And no READ tool got into the list by mistake.
     assert not {n for n in ag.CONFIRMAVEIS_SEMPRE if GUARDAS[n].read_only}
     # The six that escaped are covered.

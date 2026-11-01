@@ -34,6 +34,10 @@ def validation_error(cred_type: str, data: dict) -> str | None:
     erro = validate_required_fields(cred_type, data)
     if erro:
         return erro
+    if cred_type in ("postgresql", "mysql") and str(data.get("port") or "").strip():
+        from app.core.credentials.connection_builder import porta_valida
+        if porta_valida(data.get("port")) is None:
+            return "Porta inválida: use um número de 1 a 65535."
     if cred_type in _WFS_TYPES:
         try:
             wfs_authentication(None, {**data, "type": cred_type})

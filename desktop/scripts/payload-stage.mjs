@@ -22,16 +22,16 @@
 //   node scripts/payload-stage.mjs
 import fs from 'node:fs'
 import path from 'node:path'
-import { REPO, RESOURCES, dirSize, fail, log, mb, ok, sortedEntries, rmrf, step } from './lib.mjs'
+import { REPO, RESOURCES, dirSize, fail, log, mb, ok, sortedEntries, rmrf, step, walk } from './lib.mjs'
+import { ehSegredo } from './segredos.mjs'
 
-// Exclusions per source. Developer secrets (.env, certs/) must NEVER end up
-// in the installer — the app uses %APPDATA%\AtlansExecutor for that.
+// Exclusions per source. Developer secrets (.env and its variants, keys,
+// cert folders) are excluded from BOTH, at any depth — see segredos.mjs. They
+// must NEVER end up in the installer: the app uses %APPDATA%\AtlansExecutor.
 const TARGETS = [
   {
     nome: 'executor',
     excluir: [
-      /^\.env$/,                    // dev's local config
-      /^certs$/,                    // dev's mTLS cert
       /^__pycache__$/,
       /\.pyc$/,
       /\.sqlite(-wal|-shm)?$/,      // outbox local
@@ -47,7 +47,7 @@ function copiar(origem, destino, excluir) {
   fs.mkdirSync(destino, { recursive: true })
   let arquivos = 0
   for (const e of sortedEntries(origem)) {
-    if (excluir.some((re) => re.test(e.name))) continue
+    if (ehSegredo(e.name) || excluir.some((re) => re.test(e.name))) continue
     const de = path.join(origem, e.name)
     const para = path.join(destino, e.name)
     if (e.isDirectory()) arquivos += copiar(de, para, excluir)
@@ -68,12 +68,20 @@ for (const alvo of TARGETS) {
   log(`  ${alvo.nome.padEnd(9)} ${String(n).padStart(4)} arquivos  ${mb(dirSize(destino)).padStart(3)} MB`)
 }
 
-// Guardrail: if a dev .env slips into the installer, credentials leak.
-// Cheap to check, expensive to find out later.
-for (const proibido of ['executor/.env', 'executor/certs']) {
-  if (fs.existsSync(path.join(RESOURCES, proibido))) {
-    fail(`${proibido} entrou no payload — o filtro de exclusao falhou`)
-  }
+// Guardrail: if a dev .env or key slips into the installer, credentials leak.
+// Cheap to check, expensive to find out later. A scan of the whole copied
+// tree, not a check of two literal paths: `.env.local` or a `.pem` in flow/
+// leak just the same.
+const vazados = []
+for (const alvo of TARGETS) {
+  walk(path.join(RESOURCES, alvo.nome), (p, e) => {
+    if (!ehSegredo(e.name)) return
+    vazados.push(path.relative(RESOURCES, p))
+    return false
+  })
+}
+if (vazados.length) {
+  fail(`segredos de desenvolvimento entraram no payload — o filtro de exclusao falhou:\n    ${vazados.join('\n    ')}`)
 }
 
 // The Atlans license and the third-party notices go with the installer

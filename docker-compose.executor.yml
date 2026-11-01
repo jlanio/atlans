@@ -56,6 +56,20 @@ services:
     container_name: atlans-executor
     # on-failure: restarts on a crash (exit != 0). A revoked one exits with 0 → stops.
     restart: on-failure
+    # The executor drains on SIGTERM: up to 120 s for the running jobs and
+    # 30 s for the server to confirm their results (executor/main.py). Docker's
+    # default is 10 s, after which it SIGKILLs — every `up -d`/`restart`
+    # interrupted the jobs mid-drain, and the next boot blamed "out of memory".
+    stop_grace_period: 160s
+
+    # json-file with a ceiling: without max-size Docker keeps the executor's
+    # whole output (every job's log) until the disk fills. LOG_MAX_SIZE and
+    # LOG_MAX_FILE in the .env next to this file; 10m x 5 by default.
+    logging:
+      driver: json-file
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: ${LOG_MAX_FILE:-5}
 
     env_file: executor/.env
 

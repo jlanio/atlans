@@ -11,6 +11,7 @@ Real cases that motivated it:
     "unknown" and the run stayed "Em andamento" forever.
 """
 import asyncio
+import json
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -834,9 +835,12 @@ async def test_cancel_of_job_already_finished_does_not_lie(store):
     on_cancelled.assert_not_awaited()
 
 
-async def test_accepted_job_enters_the_journal(store):
+async def test_accepted_job_enters_the_journal(store, monkeypatch):
     from executor.job_queue import ExecutorJobQueue
 
+    # The security validation on arrival is covered by the crypto contract
+    # tests; here the message is a bare envelope.
+    monkeypatch.setattr("executor.job_executor.validar_na_chegada", lambda _m: None)
     fila = ExecutorJobQueue(on_execute=AsyncMock())
     ws = MagicMock()
     ws.send = AsyncMock()
@@ -844,6 +848,22 @@ async def test_accepted_job_enters_the_journal(store):
     await _connection(fila)._handle_job(ws, {"envelope": {"job_id": "j1"}})
 
     assert [o["job_id"] for o in store.carregar_em_voo()] == ["j1"]
+
+
+async def test_a_job_that_fails_validation_on_arrival_never_enters_the_queue(store):
+    from executor.job_queue import ExecutorJobQueue
+
+    fila = ExecutorJobQueue(on_execute=AsyncMock())
+    ws = MagicMock()
+    ws.send = AsyncMock()
+
+    # Unsigned: refused on arrival, with a validation result and no ACK.
+    await _connection(fila)._handle_job(ws, {"envelope": {"job_id": "j9"}})
+
+    assert fila.active_job_ids() == []
+    assert store.carregar_em_voo() == []
+    enviado = json.loads(ws.send.await_args.args[0])
+    assert enviado["type"] == "job_result" and enviado["error_category"] == "validation"
 
 
 async def test_inventory_merges_active_outbox_and_in_memory_queue(store):
@@ -889,3 +909,163 @@ async def test_contract_the_executor_inventory_passes_the_server_schema(store):
     assert _missing_fields(inv["type"], inv) == []
     assert ORF._inventory_ids(inv["ativos"]) == set()
     assert ORF._inventory_ids(inv["resultados"]) == set()
+
+
+# ── Half-open connection: a sent result is kept for a replay window ─────────
+# `ws.send()` returning only means the frame reached the local kernel. The copy
+# stays in the outbox (out of the "pending" count) and the next session resends it.
+
+def test_a_sent_result_stays_for_the_replay_window_and_then_goes(store):
+    store.put({"job_id": "j1", "run_id": "j1", "status": "error", "error": "x"})
+    store.mark_sent("j1")
+
+    assert store.job_ids_pendentes() == []          # no longer "not sent"
+    assert store.count_pending() == 0
+    assert [r["job_id"] for r in store.load_recently_sent()] == ["j1"]
+    assert store.load_pending() == []                               # never-sent only
+    assert [r["job_id"] for r in store.load_for_boot_replay()] == ["j1"]   # boot replays it too
+
+    store.purge_sent(agora=time.time() + store.JANELA_DE_REENVIO_S + 1)
+    assert store.load_recently_sent() == []
+    assert store.load_for_boot_replay() == []
+
+
+def test_the_boot_replay_sends_the_never_sent_first(store):
+    store.put({"job_id": "enviado", "status": "error", "error": "x"})
+    store.mark_sent("enviado")
+    store.put({"job_id": "nunca", "status": "ok"})
+
+    assert [r["job_id"] for r in store.load_for_boot_replay()] == ["nunca", "enviado"]
+
+
+def test_a_sent_success_is_not_replayed(store):
+    """The outbox keeps a result without `stats`: a replayed success would
+    close the run as success with its artifacts unregistered (fix review)."""
+    store.put({"job_id": "ok1", "status": "success", "stats": {"artefatos": [1]}})
+    store.mark_sent("ok1")
+    assert store.load_for_boot_replay() == []
+
+
+def test_a_resend_does_not_restart_the_replay_window(store):
+    """Each resend rewrote `sent_at`: rows never aged out while reconnects came
+    in under the window (fix review)."""
+    store.put({"job_id": "j1", "status": "error", "error": "x"})
+    store.mark_sent("j1")
+    primeiro = store._get_conn().execute("SELECT sent_at FROM pending_results").fetchone()[0]
+    time.sleep(0.01)
+    store.mark_sent("j1")
+    assert store._get_conn().execute("SELECT sent_at FROM pending_results").fetchone()[0] == primeiro
+
+
+def test_the_outbox_keeps_retryable(store):
+    store.put({"job_id": "j1", "status": "error", "error_category": "executor_lost", "retryable": True})
+    assert store.load_pending()[0]["retryable"] is True
+
+
+def test_a_new_result_for_the_same_job_is_pending_again(store):
+    store.put({"job_id": "j1", "status": "error", "error": "x"})
+    store.mark_sent("j1")
+    store.put({"job_id": "j1", "status": "ok"})      # replaced (e.g. the real outcome)
+    assert store.job_ids_pendentes() == ["j1"]
+
+
+def test_an_outbox_from_before_the_column_is_migrated(tmp_path, monkeypatch):
+    import sqlite3
+
+    from executor import result_store as rs
+
+    caminho = tmp_path / "antigo.db"
+    c = sqlite3.connect(caminho)
+    c.execute("CREATE TABLE pending_results (job_id TEXT PRIMARY KEY, payload TEXT NOT NULL, "
+              "created_at REAL NOT NULL, attempts INTEGER NOT NULL DEFAULT 0)")
+    c.execute("INSERT INTO pending_results VALUES ('velho', '{\"job_id\": \"velho\"}', 1.0, 0)")
+    c.commit()
+    c.close()
+    monkeypatch.setattr(rs, "_DB_PATH", str(caminho))
+    monkeypatch.setattr(rs, "_conn", None)
+    monkeypatch.setattr(rs, "_disabled", False)
+    try:
+        assert rs.job_ids_pendentes() == ["velho"]
+        rs.mark_sent("velho")
+        assert rs.job_ids_pendentes() == []
+    finally:
+        if rs._conn is not None:
+            rs._conn.close()
+
+
+async def test_a_new_session_resends_what_the_previous_one_sent(store):
+    fila = asyncio.Queue()
+    conn = _new_connection(fila)
+    store.put({"job_id": "j1", "run_id": "j1", "status": "error", "error": "x"})
+    store.mark_sent("j1")
+    # A sent SUCCESS is not resent from the outbox (no stats there)...
+    store.put({"job_id": "ok1", "run_id": "ok1", "status": "success"})
+    store.mark_sent("ok1")
+
+    await conn._reenviar_resultados_recentes()
+    assert fila.get_nowait()["job_id"] == "j1"
+    assert fila.empty()
+    # Already queued: not added twice.
+    fila.put_nowait({"job_id": "j1"})
+    await conn._reenviar_resultados_recentes()
+    assert fila.qsize() == 1
+
+
+async def test_the_session_replay_leaves_room_for_live_results(store, monkeypatch):
+    """With a long list of recent results, the replay filled the 86-slot queue
+    and the next live result was dropped (fix review): it now waits for room."""
+    fila = asyncio.Queue(maxsize=20)
+    conn = _new_connection(fila)
+    monkeypatch.setattr(type(conn), "_REENVIO_INTERVALO_S", 0)
+    for i in range(30):
+        store.put({"job_id": f"j{i}", "run_id": f"j{i}", "status": "error", "error": "x"})
+        store.mark_sent(f"j{i}")
+
+    tarefa = asyncio.create_task(conn._reenviar_resultados_recentes())
+    await asyncio.sleep(0.05)
+    assert fila.qsize() <= conn._REENVIO_RESERVA       # room left for live results
+    tarefa.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await tarefa
+
+
+async def test_a_sent_success_is_resent_whole_from_memory(store, monkeypatch):
+    """A half-open socket loses a success silently. The outbox's copy has no
+    stats; the WHOLE result is kept in memory for the window and resent by the
+    next session of the same process, so the run closes as the success it was
+    instead of a "lost" failure whose retry repeats side effects (round-2 review)."""
+    fila = asyncio.Queue()
+    conn = _new_connection(fila)
+    monkeypatch.setattr(type(conn), "_REENVIO_INTERVALO_S", 0)
+    completo = {"job_id": "ok1", "run_id": "ok1", "status": "success", "stats": {"artefatos": ["a.geojson"]}}
+    conn._lembrar_sucesso("ok1", completo)
+    store.put(completo)
+    store.mark_sent("ok1")
+
+    # Still "on its way" for the inventory: the server must not close it as lost.
+    assert "ok1" in conn._results_in_flight()
+
+    await conn._reenviar_resultados_recentes()
+    reenviado = fila.get_nowait()
+    assert reenviado["stats"] == {"artefatos": ["a.geojson"]}
+
+
+def test_the_memory_of_sent_successes_is_bounded_and_keeps_the_first_instant(monkeypatch):
+    from executor import connection as C
+
+    conn = _new_connection(asyncio.Queue())
+    conn._lembrar_sucesso("j1", {"job_id": "j1", "status": "success"})
+    primeiro = conn._sucessos_enviados["j1"][0]
+    conn._lembrar_sucesso("j1", {"job_id": "j1", "status": "success"})
+    assert conn._sucessos_enviados["j1"][0] == primeiro      # a resend does not restart it
+    conn._lembrar_sucesso("e1", {"job_id": "e1", "status": "error"})
+    assert "e1" not in conn._sucessos_enviados               # failures live in the outbox
+
+    monkeypatch.setattr(C, "_SUCESSOS_MAX", 3)
+    for i in range(10):
+        conn._lembrar_sucesso(f"s{i}", {"job_id": f"s{i}", "status": "success"})
+    assert list(conn._sucessos_enviados) == ["s7", "s8", "s9"]
+
+    monkeypatch.setattr(C, "_SUCESSOS_JANELA_S", -1)
+    conn._podar_sucessos()
+    assert conn._sucessos_enviados == {}

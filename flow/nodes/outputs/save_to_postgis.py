@@ -36,6 +36,8 @@ class SaveToPostGIS(BaseNode):
       - chunksize: features per COPY (0 -> automatic; controls peak memory)
     """
 
+    TEM_EFEITO_COLATERAL = True
+
     @classmethod
     def description(cls) -> Dict[str, Any]:
         return {

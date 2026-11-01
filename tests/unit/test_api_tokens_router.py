@@ -198,7 +198,8 @@ async def test_password_reset_revokes_the_user_tokens(api, sessao):
     criado = (await api.post("/auth/tokens", json=_payload())).json()
 
     with patch("app.api.routers.auth_router.verify_password_reset_token", AsyncMock(return_value=USUARIO)), \
-         patch("app.api.routers.auth_router.hash_password", lambda senha: "hash-novo"):
+         patch("app.api.routers.auth_router.hash_password", lambda senha: "hash-novo"), \
+         patch("app.api.routers.auth_router.revoke_user_sessions", AsyncMock()) as revogar_sessoes:
         r = await api.post(
             "/auth/reset-password",
             json={"token": "t", "password": "NovaSenha!123", "password_confirm": "NovaSenha!123"},  # pragma: allowlist secret
@@ -208,3 +209,5 @@ async def test_password_reset_revokes_the_user_tokens(api, sessao):
     linha = (await sessao.execute(select(ApiToken).where(ApiToken.id_hash == criado["id"]))).scalar_one()
     await sessao.refresh(linha)
     assert linha.revoked_reason == "password_reset"
+    # ...and the browser sessions too (auth_router.reset_password).
+    revogar_sessoes.assert_awaited_once_with(USUARIO)

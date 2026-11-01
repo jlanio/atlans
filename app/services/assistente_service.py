@@ -192,6 +192,41 @@ MENSAGEM_DE_EXECUTAR_ANTES = (
 )
 
 
+# The editor has no confirmation card, and `run_workflow` there runs the
+# person's own SAVED workflow — the only precondition above (`desenhou`) is a
+# flag the model sets itself. Executing is still the assistant's job for graphs
+# that read and transform; a workflow that acts outside (e-mail, webhook,
+# database or Drive writes, portal, a stored credential —
+# `assistente_efeitos.nos_que_agem`) is run by the person, with the editor's
+# own Executar button.
+MENSAGEM_DE_EXECUTAR_COM_EFEITO = (
+    "Este fluxo tem nos que agem fora da plataforma ({nos}). Quem executa um fluxo "
+    "assim e a pessoa, pelo botao Executar do editor. Diga isso em uma linha e nao "
+    "chame `run_workflow` de novo para este fluxo."
+)
+
+
+async def _editor_run_acts(estado: EstadoDoLaco, argumentos: Any) -> list[str] | None:
+    """The acting nodes of the workflow `run_workflow` would run; `None` when it
+    cannot be read — and then the run is refused too (fail closed)."""
+    from app.mcp import infra
+    from app.mcp.resolucao import carregar_workflow
+    from app.services.assistente_efeitos import nos_que_agem
+
+    ref = argumentos.get("workflow_id") if isinstance(argumentos, dict) else None
+    if not ref:
+        return None
+    try:
+        async with infra.sessao() as db:
+            wf, _role = await carregar_workflow(db, estado.escopo, str(ref))
+            # Read inside the block: the session's rollback expires `wf`.
+            # Running creates no schedule: the trigger nodes do not count.
+            return nos_que_agem(getattr(wf, "definition", None), disparos=False)
+    except Exception:
+        logger.exception("Nao foi possivel ler o fluxo %s no editor; recusando a execucao.", ref)
+        return None
+
+
 def bloqueada_no_editor(nome: str) -> bool:
     """True if this tool cannot be used by the assistant."""
     guarda = GUARDAS.get(nome)
@@ -678,6 +713,12 @@ async def _editor_gate(
     if nome in EXIGEM_DESENHO_ANTES and not estado.desenhou:
         logger.info("Assistente barrou %s antes do desenho (usuário %s).", nome, estado.escopo.user_id)
         return (MENSAGEM_DE_EXECUTAR_ANTES, True)
+    if nome == "run_workflow":
+        agem = await _editor_run_acts(estado, argumentos)
+        if agem is None or agem:
+            logger.info("Assistente barrou %s com efeito externo (usuário %s).", nome, estado.escopo.user_id)
+            lista = ", ".join(agem[:5]) if agem else "não foi possível conferir o fluxo"
+            return (MENSAGEM_DE_EXECUTAR_COM_EFEITO.format(nos=lista), True)
     if bloqueada_no_editor(nome):
         # The gate's GUARANTEE, not the convenience. Hiding the tool from the list
         # keeps the model from wanting it; refusing here prevents it from running

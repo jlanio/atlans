@@ -307,8 +307,10 @@ testing. `RATE_LIMIT_STORAGE_URI=memory://` in the dev `.env` avoids that, and t
 reset the counters:
 
 ```bash
-docker compose exec redis sh -c 'redis-cli --no-auth-warning -a "$REDIS_PASSWORD" --scan --pattern "LIMITS:*" | xargs -r redis-cli --no-auth-warning -a "$REDIS_PASSWORD" del'
+docker compose exec redis sh -c 'export REDISCLI_AUTH="$REDIS_PASSWORD"; redis-cli --no-auth-warning --scan --pattern "LIMITS:*" | xargs -r redis-cli --no-auth-warning del'
 ```
+
+(The password goes in `REDISCLI_AUTH`, not `-a`: on a command line it shows up in `ps`.)
 
 ## Database query timeouts
 
@@ -582,6 +584,56 @@ and at most 4 GB): when it fills up, the oldest goes. To keep more, raise
 `SystemMaxUse` in `/etc/systemd/journald.conf`. The journal needs to be
 persistent — without the `/var/log/journal` directory, it lives in memory and vanishes at the
 next boot.
+
+The options of each driver are in [docker-compose.logs.yml](../docker-compose.logs.yml)
+(`api-prod` and `web-prod` take theirs from there by `LOG_DRIVER`):
+`json-file`, `journald`, `local`, `syslog`, `gelf`, `fluentd`, `awslogs` and
+`splunk` are defined (the collectors' address comes from the driver's own
+options, in `daemon.json` or an edit there). Another driver needs its
+`api-<driver>`/`web-<driver>` blocks there; without them `docker compose`
+stops with `service "api-<driver>" not found`.
+
+### Log rotation
+
+Every other service (Traefik, Redis, MinIO, step-ca and the dev ones), and the
+API and the web with `LOG_DRIVER=json-file` or `local`, write with a ceiling:
+`LOG_MAX_SIZE` × `LOG_MAX_FILE` per container (default `10m` × `5`).
+`docker compose logs` reads the rotated files too. Changing the values takes a
+recreate (`docker compose --profile prod up -d`).
+
+A host that ships every container's log through its own `daemon.json`
+(journald, Loki, a SIEM) sets `LOG_SERVICOS=daemon`: the other services then
+keep the daemon's driver, with the daemon's ceiling, instead of `json-file`.
+
+### Traefik access log
+
+It goes to Traefik's output, in JSON, under that same rotation:
+
+```bash
+docker compose --profile prod logs traefik --since 1h | grep '"RequestMethod"'
+```
+
+It used to be written to `logs/traefik/access.log` on the host, a file Traefik
+never rotates. To keep it in a file (for fail2ban, goaccess...), set
+`TRAEFIK_ACCESSLOG_FILEPATH=/var/log/traefik/access.log` in the `.env`: it lands in
+`TRAEFIK_LOG_DIR` (default `./logs/traefik`), and rotating it is the host's job —
+for example, `/etc/logrotate.d/atlans-traefik`:
+
+```
+/caminho/da/instalacao/logs/traefik/access.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    postrotate
+        cd /caminho/da/instalacao && docker compose --profile prod kill -s USR1 traefik
+    endscript
+}
+```
+
+`USR1` makes Traefik reopen the file after the rename.
 
 ## Workflows with renamed nodes
 

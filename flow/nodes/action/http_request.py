@@ -7,6 +7,7 @@ import geopandas as gpd
 from urllib.parse import parse_qsl, urlparse
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
+from flow.utils.error_taxonomy import RequestAlreadyDelivered
 from flow.utils.geo_helpers import gdf_para_geojson, safe_httpx_request
 from flow.utils.autenticacao_http import (
     CREDENTIAL_HEADERS,
@@ -90,6 +91,11 @@ class HttpRequestNode(BaseNode):
     - If the method is POST/PUT/PATCH and 'body' is empty, uses the payload from inputs.
       Received GeoDataFrames are automatically converted to GeoJSON.
     """
+
+    def tem_efeito_colateral(self) -> bool:
+        # Only methods that read are safe to repeat after an ambiguous failure.
+        metodo = str(self.parameters.get("method", "GET") or "GET").strip().upper()
+        return metodo not in ("GET", "HEAD", "OPTIONS")
 
     @classmethod
     def description(cls) -> Dict[str, Any]:
@@ -384,6 +390,7 @@ class HttpRequestNode(BaseNode):
         # through the same function, which revalidates the URL and redoes the IP pinning.
         if follow_redirect:
             saltos = 0
+            ja_entregue = False
             while response.is_redirect and saltos < max_redirects:
                 destino = response.headers.get('location')
                 if not destino:
@@ -420,6 +427,11 @@ class HttpRequestNode(BaseNode):
                     request_kwargs['method'] = 'GET'
                     request_kwargs.pop('json', None)
                     request_kwargs.pop('content', None)
+                    # The server APPLIED the original request and points to its
+                    # result ("see other"): from here a failure is after delivery.
+                    # A 307/308 asks to repeat the request elsewhere — no proof
+                    # it was applied, so a failure there keeps its own meaning.
+                    ja_entregue = True
 
                 # The circuit breaker is PER HOST, and after the hop the host is different:
                 # continuing to use the original address's breaker counted the
@@ -429,7 +441,19 @@ class HttpRequestNode(BaseNode):
                 try:
                     response = await hop_breaker.call(_do_request)
                 except CircuitOpenError as e:
+                    if ja_entregue:
+                        raise RequestAlreadyDelivered(str(e))
                     raise RuntimeError(str(e))
+                except httpx.TransportError as e:
+                    if not ja_entregue:
+                        raise
+                    # The ORIGINAL request was applied (it is what answered the
+                    # 303): a connection refused here must not read as "nothing
+                    # was sent", or the executor would repeat a POST the API
+                    # already applied.
+                    raise RequestAlreadyDelivered(
+                        f"Erro ao seguir o redirecionamento para {destino}: {e}"
+                    ) from e
                 saltos += 1
 
             if response.is_redirect:

@@ -337,3 +337,65 @@ async def test_replay_rebuilds_the_quick_replies_from_suggest_replies(sessao):
     assert tipos == ["usuario", "texto", "ferramenta", "ferramenta_fim", "respostas_rapidas", "fim"]
     chips = [q for q in quadros if q["tipo"] == "respostas_rapidas"]
     assert chips[0]["dados"] == {"opcoes": ["Só os últimos 7 dias", "Cruzar com o CAR"]}
+
+
+# ── A call waiting for the click comes back as a card on reload ──────────────
+
+
+async def _conversa_com_pendente(sessao):
+    """What the REAL loop records: the tool_use, then the gate's non-error
+    "aguardando" verdict as its tool_result (`_call_epilogue`)."""
+    conv = await svc.create_conversation(sessao, user_id=USUARIO, titulo="t")
+    chamada = {
+        "type": "tool_use", "id": "tu-pend", "name": "delete_schedule",
+        "input": {"schedule_id": "sch-1"},
+    }
+    await svc.append_messages(
+        sessao,
+        conv.id_hash,
+        [
+            {"role": "user", "content": "apaga o agendamento"},
+            {"role": "assistant", "content": [chamada]},
+            {"role": "user", "content": [{
+                "type": "tool_result", "tool_use_id": "tu-pend",
+                "content": ag.AWAITING_MESSAGE, "is_error": False,
+            }]},
+        ],
+        initial_order=0,
+    )
+    return conv
+
+
+async def test_a_pending_confirmation_is_reopened_even_with_the_awaiting_result(sessao):
+    conv = await _conversa_com_pendente(sessao)
+    redis = FakeRedis()
+    chave = ag.chave_de_confirmacao(USUARIO, conv.id_hash, "tu-pend")
+    redis.dados[chave] = json.dumps({
+        "token": "tok-1", "tool": "delete_schedule", "args": {"schedule_id": "sch-1"},
+        "efeitos": ["SendEmail (n4)"],
+    })
+
+    quadros = await svc.replay_frames(sessao, conv.id_hash, redis=redis, user_id=USUARIO, tokens_total=0)
+
+    tipos = [q["tipo"] for q in quadros]
+    assert "confirmacao" in tipos
+    # The same frames as live: the card, then the call closed WITHOUT error
+    # (waiting, not failed — an error flag turned the step red on reload).
+    fins = [q for q in quadros if q["tipo"] == "ferramenta_fim" and q["dados"]["id"] == "tu-pend"]
+    assert [f["dados"]["erro"] for f in fins] == [False]
+    assert tipos.index("confirmacao") < quadros.index(fins[0])
+    (card,) = [q for q in quadros if q["tipo"] == "confirmacao"]
+    assert card["dados"]["token"] == "tok-1"
+    assert card["dados"]["acao"]["tool"] == "delete_schedule"
+    assert card["dados"]["acao"]["alvo"] == "sch-1"
+    # Why the click was asked comes back too (stored with the confirmation).
+    assert card["dados"]["acao"]["efeitos"] == ["SendEmail (n4)"]
+
+
+async def test_a_decided_or_expired_confirmation_closes_the_call(sessao):
+    conv = await _conversa_com_pendente(sessao)
+
+    quadros = await svc.replay_frames(sessao, conv.id_hash, redis=FakeRedis(), user_id=USUARIO, tokens_total=0)
+
+    assert "confirmacao" not in [q["tipo"] for q in quadros]
+    assert [q for q in quadros if q["tipo"] == "ferramenta_fim" and q["dados"]["id"] == "tu-pend"]

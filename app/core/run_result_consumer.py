@@ -23,6 +23,7 @@ it automatically, so it is the only record of loss besides the log.
 """
 
 import asyncio
+import contextlib
 import hashlib
 import hmac
 import ipaddress
@@ -34,6 +35,7 @@ import os
 import re
 import time as _time
 import unicodedata
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -276,7 +278,21 @@ async def _process_result(db, payload: dict) -> bool:
         await db.commit()  # solta a trava do FOR UPDATE
         return True
 
+    # The server had closed this run with a GUESS (executor vanished, run lost in
+    # the reconciliation) and the real result is correcting it. The guess was
+    # already counted in usage_daily as a failure; the correction moves it.
+    corrige_inferido = (
+        not first_close
+        and _outcome_inferred_by_server(run)
+        and payload.get("status") != run.status
+    )
+
+    # The guess was counted on the day the SERVER closed the run; read that
+    # moment before `_update_run_status` overwrites `end_time`.
+    fechado_pelo_servidor_em = run.end_time
     await _update_run_status(db, run, payload)
+    if corrige_inferido:
+        await _correct_inferred_usage(db, run, fechado_pelo_servidor_em)
 
     # Usage accounting comes FIRST: it is the only billing data and must not
     # depend on metrics (which the error path may not produce).
@@ -863,6 +879,15 @@ async def _fire_notification_if_configured(db, run: WorkflowRun) -> None:
                 )
                 return
 
+    # Once per run. This is the one phase with an effect OUTSIDE the platform,
+    # and it had no idempotency guard: a result delivered twice (the executor
+    # resending after a dropped socket while the first copy was still queued,
+    # a dead-letter reprocess, the reliable queue handing an item back) posted
+    # the customer's webhook twice. The key outlives any redelivery window.
+    if not await _first_notification(run.task_id):
+        logger.info("Notificacao do run %s ja enviada — reentrega ignorada.", run.task_id)
+        return
+
     notify_body = {
         "task_id":          run.task_id,
         "workflow_hash":    run.workflow_hash,
@@ -871,6 +896,23 @@ async def _fire_notification_if_configured(db, run: WorkflowRun) -> None:
         "error_message":    run.error_message,
     }
     _schedule_webhook_notification(notification_url, notify_body)
+
+
+_NOTIFIED_PREFIX = "run_notificado:"
+_NOTIFIED_TTL_S = 7 * 24 * 3600
+
+
+async def _first_notification(task_id: str) -> bool:
+    """True the first time it is called for `task_id` (SET NX). Fails open: with
+    Redis unreachable a duplicate is better than a notification never sent."""
+    from app.core.redis import get_redis_pool
+    try:
+        return bool(await get_redis_pool().set(
+            f"{_NOTIFIED_PREFIX}{task_id}", "1", nx=True, ex=_NOTIFIED_TTL_S,
+        ))
+    except Exception as exc:
+        logger.warning("Guarda de notificacao indisponivel (%s) — enviando mesmo assim.", exc)
+        return True
 
 
 async def _get_retention_days(db) -> int | None:
@@ -1428,6 +1470,49 @@ async def _upsert_usage_daily(db, run: WorkflowRun, stats: dict, first_close: bo
     logger.debug("run %s: usage_daily atualizado (status=%s).", run.task_id, run.status)
 
 
+async def _correct_inferred_usage(db, run: WorkflowRun, contado_em=None) -> None:
+    """Moves a run counted as a failure (the server's guess) to its real outcome.
+
+    Only the outcome counters change; the run was already in `total_runs`.
+    The row is the one of the day the guess was counted (`contado_em`, the
+    server's close): across midnight, today's row would move another run's
+    failure, or none. Best-effort: a failure here is logged, never blocks the
+    run's update.
+    """
+    from app.models.run_metrics import UsageDaily
+    from sqlalchemy import update as sa_update
+
+    if not run.workspace_id or run.status not in ("success", "cancelled"):
+        return
+    try:
+        await db.execute(
+            sa_update(UsageDaily)
+            .where(
+                UsageDaily.date == _utc_date(contado_em),
+                UsageDaily.workspace_id == run.workspace_id,
+                UsageDaily.failed_runs > 0,
+            )
+            .values(
+                failed_runs=UsageDaily.failed_runs - 1,
+                successful_runs=UsageDaily.successful_runs + (1 if run.status == "success" else 0),
+            )
+        )
+        await db.commit()
+    except Exception as exc:
+        logger.warning("run %s: correcao de usage_daily nao aplicada: %s", run.task_id, exc)
+        with contextlib.suppress(Exception):
+            await db.rollback()
+
+
+def _utc_date(momento):
+    """The UTC date of a moment (naive = already UTC); today without one."""
+    if momento is None:
+        return utc_now_naive().date()
+    if getattr(momento, "tzinfo", None) is not None:
+        momento = momento.astimezone(timezone.utc)
+    return momento.date()
+
+
 def _ip_do_payload(payload: dict) -> str | None:
     """The result's `executor_ip`, only if it is an IP that fits the column (45)."""
     return _valid_ip(payload.get("executor_ip"))
@@ -1577,13 +1662,115 @@ async def _persist_metrics(db, run: WorkflowRun, metrics: dict, payload: dict) -
     logger.debug("run %s: metricas persistidas.", run.task_id)
 
 
-async def _consume_one(r: aioredis.Redis, queue: str, handler) -> None:
-    """Read one item from the queue and call the handler. Manages retry and dead letter."""
-    item = await r.brpop(queue, timeout=2)
-    if not item:
-        return
+# ── Reliable queue ────────────────────────────────────────────────────────────
+# BRPOP removed the item before it was processed: a deploy (SIGTERM cancels the
+# task), an OOM or a SIGKILL between the pop and the commit lost the result —
+# the run stayed "running" until the inventory closed a SUCCESSFUL run as
+# lost. Each consumer now MOVES the item to its own processing list
+# (BLMOVE) and removes it from there only when done. A consumer that stops
+# renewing its liveness key leaves its list behind, and any live consumer
+# moves those items back to the queue. Processing twice is safe: the run's
+# first outcome wins, usage counts once and the notification is guarded.
+QUEUE_PROCESSING_PREFIX = "run_results:processando:"
+CONSUMER_ALIVE_PREFIX = "run_results:consumidor:"
+_CONSUMER_ALIVE_TTL_S = 60
+_CONSUMER_HEARTBEAT_S = 15
+_RECLAIM_INTERVAL_S = 60
 
-    raw = item[1]
+
+# An item handled for longer than this is considered stuck: the heartbeat stops
+# renewing, so another worker reclaims it once the key expires. Far above any
+# legitimate item (a FOR UPDATE wait is capped by the 60 s statement timeout).
+_ITEM_PRESO_S = 15 * 60
+
+
+async def _keep_alive(r: aioredis.Redis, chave_viva: str, item: dict | None = None) -> None:
+    """Renews the consumer's liveness key for as long as the consumer lives.
+
+    A task of its own, not a step of the loop: renewed only BETWEEN items, an
+    item that took longer than the TTL (a `FOR UPDATE` wait, slow storage)
+    looked abandoned, and another worker put it back on the queue while this
+    one was still processing it — the same result handled twice, at the same
+    time. A Redis error only skips a beat; the loop's own reconnect handles a
+    dead connection."""
+    while True:
+        desde = (item or {}).get("desde")
+        if desde is not None and _time.monotonic() - desde > _ITEM_PRESO_S:
+            # A handler that never returns would hold its item forever behind
+            # a live key: stop vouching for it, and it is reclaimed.
+            logger.error(
+                "Consumer: item em processamento ha mais de %ds — deixando de renovar "
+                "a chave de vida para que seja reivindicado.", _ITEM_PRESO_S,
+            )
+        else:
+            try:
+                await r.set(chave_viva, "1", ex=_CONSUMER_ALIVE_TTL_S)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning("Consumer: falha ao renovar a chave de vida: %s", exc)
+        await asyncio.sleep(_CONSUMER_HEARTBEAT_S)
+
+
+async def _reclaim_abandoned(r: aioredis.Redis, queue: str, my_processing: str) -> int:
+    """Moves back to the queue the items of consumers that are gone."""
+    devolvidos = 0
+    async for chave in r.scan_iter(match=f"{QUEUE_PROCESSING_PREFIX}*", count=100):
+        if chave == my_processing:
+            continue
+        dono = chave.removeprefix(QUEUE_PROCESSING_PREFIX)
+        if await r.exists(f"{CONSUMER_ALIVE_PREFIX}{dono}"):
+            continue
+        # To the consuming end (the right), newest first, so the oldest ends up
+        # outermost and is taken next: the original order is kept.
+        while await r.lmove(chave, queue, "LEFT", "RIGHT") is not None:
+            devolvidos += 1
+    if devolvidos:
+        logger.warning(
+            "Consumer: %d resultado(s) de um consumidor encerrado devolvido(s) a fila.",
+            devolvidos,
+        )
+    return devolvidos
+
+
+async def _consume_one(
+    r: aioredis.Redis, queue: str, handler, processing_key: str | None = None,
+) -> None:
+    """Read one item from the queue and call the handler. Manages retry and dead letter.
+
+    With `processing_key`, the item is moved there (BLMOVE) instead of popped,
+    and removed only after it was handled — see "Reliable queue" above.
+    """
+    if processing_key is None:
+        item = await r.brpop(queue, timeout=2)
+        if not item:
+            return
+        raw = item[1]
+    else:
+        raw = await r.blmove(queue, processing_key, 2, "RIGHT", "LEFT")
+        if raw is None:
+            return
+    try:
+        await _handle_item(r, queue, handler, raw)
+    except asyncio.CancelledError:
+        if processing_key is not None:
+            # Shutdown in the middle of the item: hand it back right away (best
+            # effort; otherwise another consumer reclaims it once this one's
+            # liveness key expires).
+            with contextlib.suppress(Exception):
+                await asyncio.shield(_devolver(r, processing_key, queue, raw))
+        raise
+    else:
+        if processing_key is not None:
+            await r.lrem(processing_key, 1, raw)
+
+
+async def _devolver(r: aioredis.Redis, processing_key: str, queue: str, raw: str) -> None:
+    if await r.lrem(processing_key, 1, raw):
+        await r.rpush(queue, raw)
+
+
+async def _handle_item(r: aioredis.Redis, queue: str, handler, raw: str) -> None:
     try:
         # The job_result `stats` goes up to ~4MB; the dumps is already offloaded in the
         # producer, and the loads of a large payload also freezes the event loop
@@ -1594,6 +1781,13 @@ async def _consume_one(r: aioredis.Redis, queue: str, handler) -> None:
             payload = json.loads(raw)
     except json.JSONDecodeError as exc:
         logger.error("Payload inválido na fila %s: %s — %s", queue, raw[:200], exc)
+        await r.lpush(QUEUE_DEAD_LETTER, raw)
+        return
+    if not isinstance(payload, dict):
+        # Valid JSON that is not an object: every path below reads it as a dict,
+        # and the error handler itself would raise — the item would stay in the
+        # processing list and crash a consumer on every reclaim.
+        logger.error("Payload que nao e objeto na fila %s: %s", queue, raw[:200])
         await r.lpush(QUEUE_DEAD_LETTER, raw)
         return
 
@@ -1660,8 +1854,29 @@ async def run_consumer_loop() -> None:
             logger.info("Consumer run_results iniciado." if attempt == 0
                         else "Consumer run_results reconectado (tentativa %d)." % attempt)
             attempt = 0
-            while True:
-                await _consume_one(r, QUEUE_RESULTS, _process_result)
+            consumidor = uuid.uuid4().hex
+            processando = f"{QUEUE_PROCESSING_PREFIX}{consumidor}"
+            vivo = f"{CONSUMER_ALIVE_PREFIX}{consumidor}"
+            # Alive BEFORE the first item, and renewed while an item is handled.
+            await r.set(vivo, "1", ex=_CONSUMER_ALIVE_TTL_S)
+            em_curso: dict = {"desde": None}
+            pulso = asyncio.create_task(_keep_alive(r, vivo, em_curso))
+            try:
+                proxima_reivindicacao = 0.0
+                while True:
+                    agora = _time.monotonic()
+                    if agora >= proxima_reivindicacao:
+                        await _reclaim_abandoned(r, QUEUE_RESULTS, processando)
+                        proxima_reivindicacao = agora + _RECLAIM_INTERVAL_S
+                    em_curso["desde"] = _time.monotonic()
+                    try:
+                        await _consume_one(r, QUEUE_RESULTS, _process_result, processando)
+                    finally:
+                        em_curso["desde"] = None
+            finally:
+                pulso.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await pulso
         except asyncio.CancelledError:
             # API shutdown — propagate without reconnecting
             logger.info("Consumer run_results encerrado (cancelado).")

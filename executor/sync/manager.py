@@ -423,7 +423,10 @@ class SyncManager:
     async def _process_drive_event(self, event: dict):
         """Processa um evento push do servidor (file_created, file_deleted, file_updated)."""
         action = event.get("action", "")
-        file_info = event.get("file", {})
+        # `"file": null` (or any non-object) is ignored like a missing file.
+        file_info = event.get("file")
+        if not isinstance(file_info, dict):
+            file_info = {}
         id_hash = file_info.get("id_hash", "")
         original_name = file_info.get("original_name", "")
         content_md5 = file_info.get("content_md5")

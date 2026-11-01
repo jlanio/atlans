@@ -15,6 +15,7 @@ from pathlib import Path
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import make_url
 from alembic import context
 from dotenv import load_dotenv
 
@@ -23,21 +24,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 load_dotenv()
 
-# Import Base and all models so the metadata is populated
+# Base and EVERY model, so the metadata is complete: the package imports each
+# of its modules (and the extensions' models). A list here left eight tables
+# out, and autogenerate proposed dropping them.
+import app.models  # noqa: F401, E402
 from app.models.base import Base  # noqa: E402
-from app.models import (  # noqa: F401, E402
-    models,
-    user,
-    workspace,
-    credential,
-    system_config,
-    workspace_member,
-    artifact,
-    executor,
-    workspace_executor,
-    api_token,
-    conversa,
-)
 
 config = context.config
 
@@ -69,7 +60,7 @@ def _include_object(obj, name, type_, reflected, compare_to):
 def _get_sync_url() -> str:
     """
     Returns DATABASE_URL converted to the synchronous driver (psycopg2).
-    Removes sslmode from the query string and passes it via connect_args if needed.
+    The ssl/sslmode parameter is moved to connect_args by `_connect_args`.
     """
     url = os.environ["DATABASE_URL"]
     # Swap the async driver for the sync one
@@ -96,23 +87,114 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+_SSL_OFF = {"disable", "false", "0", "no", "allow"}
+_SSL_VERIFY = {"verify-ca", "verify-full"}
+
+
+def _bundle_do_sistema() -> str | None:
+    """The system's CA bundle file, the one Python's `ssl` trusts by default."""
+    import ssl
+
+    caminhos = ssl.get_default_verify_paths()
+    for candidato in (caminhos.cafile, caminhos.openssl_cafile, "/etc/ssl/certs/ca-certificates.crt"):
+        if candidato and os.path.isfile(candidato):
+            return candidato
+    try:
+        import certifi
+
+        return certifi.where()
+    except Exception:
+        return None
+
+
+def _raizes_confiaveis(modo: str, ca_cert: str) -> str:
+    """`sslrootcert` for verify-ca / verify-full.
+
+    verify-ca checks the chain WITHOUT the host name: trusting public roots
+    there lets a MITM with ANY publicly issued certificate in. So:
+      verify-ca    a configured DATABASE_CA_CERT ALONE (missing file → libpq
+                   fails naming it: fail closed); without one, libpq's
+                   "system" — which libpq itself refuses for verify-ca, with a
+                   message saying why: set DATABASE_CA_CERT.
+      verify-full  the system's roots plus DATABASE_CA_CERT when that file
+                   exists (the host name is checked, so a public root is safe —
+                   the same roots the API trusts, app/core/db.py).
+    """
+    if modo == "verify-ca":
+        return ca_cert or "system"
+    sistema = _bundle_do_sistema()
+    if ca_cert and os.path.isfile(ca_cert):
+        if not sistema:
+            return ca_cert
+        import atexit
+        import tempfile
+
+        fd, combinado = tempfile.mkstemp(prefix="pg-roots-", suffix=".pem")
+        with os.fdopen(fd, "wb") as destino:
+            for origem in (sistema, ca_cert):
+                with open(origem, "rb") as f:
+                    destino.write(f.read().rstrip(b"\n") + b"\n")
+        atexit.register(lambda: os.path.exists(combinado) and os.remove(combinado))
+        return combinado
+    # libpq 16+ reads "system" as the OpenSSL default store.
+    return sistema or "system"
+
+
+def _connect_args(url: str) -> tuple[str, dict]:
+    """(URL without ssl/sslmode, psycopg2 connect_args) — the TLS of DATABASE_URL.
+
+    The same reading as the API's engine (app/core/db.py, `_parse_url`):
+      - no parameter                → nothing (libpq's default)
+      - disable/false/0/no/allow    → sslmode=disable
+      - verify-ca / verify-full     → the same mode, with the CA of
+                                      DATABASE_CA_CERT as `sslrootcert`
+      - require/prefer/true/1/...   → sslmode=require (encrypts, does not verify)
+
+    verify-ca/verify-full used to become `require` here: the API refused a server
+    with the wrong certificate and `alembic upgrade`, with the same URL, accepted
+    it — a MITM got the migration connection, with the owner's credentials.
+    The roots trusted: see `_raizes_confiaveis` (verify-ca only the private CA;
+    verify-full the system's plus the CA, like the API).
+    """
+    connect_args: dict = {}
+    match = re.search(r"[?&](?:ssl|sslmode)=([^&]+)", url)
+    if not match:
+        return url, connect_args
+
+    raw_value = match.group(1).lower()
+    # The parameter goes with the `&` after it, and its `?`/`&` stays: the next
+    # parameter keeps a valid separator (`?ssl=x&a=b` -> `?a=b`).
+    url = re.sub(r"([?&])(?:ssl|sslmode)=[^&]*&?", r"\1", url)
+    url = url.rstrip("?&")
+
+    if raw_value in _SSL_OFF:
+        connect_args["sslmode"] = "disable"
+    elif raw_value in _SSL_VERIFY:
+        connect_args["sslmode"] = raw_value
+        connect_args["sslrootcert"] = _raizes_confiaveis(raw_value, os.getenv("DATABASE_CA_CERT", "").strip())
+    else:
+        connect_args["sslmode"] = "require"
+    return url, connect_args
+
+
+def _session_options(url: str) -> str:
+    """libpq `options` for the migration session: the URL's own plus timezone=UTC.
+
+    The same session time zone as the API (app/core/db.py, `_utc_session`): a
+    `now()` that a migration writes into a TIMESTAMP column comes out in UTC, like
+    the rows the API writes, whatever the server's `timezone`. connect_args
+    replaces the URL's `options`, so those are carried over.
+    """
+    proprias = make_url(url).query.get("options", "")
+    if isinstance(proprias, tuple):
+        proprias = " ".join(proprias)
+    return f"{proprias} -c timezone=UTC".strip()
+
+
 def run_migrations_online() -> None:
     """Connects to the database and applies migrations."""
-    url = _get_sync_url()
-
-    # Extract ssl/sslmode from the URL and pass it via connect_args to psycopg2
-    sslmode = None
-    match = re.search(r"[?&](?:ssl|sslmode)=([^&]+)", url)
-    if match:
-        raw_value = match.group(1).lower()
-        sslmode = "disable" if raw_value in {"disable", "false", "0", "no", "allow"} else "require"
-        url = re.sub(r"[?&](?:ssl|sslmode)=[^&]*", "", url)
-        url = re.sub(r"\?&", "?", url)
-        url = url.rstrip("?&")
-
-    connect_args = {}
-    if sslmode:
-        connect_args["sslmode"] = sslmode
+    url, connect_args = _connect_args(_get_sync_url())
+    connect_args["options"] = _session_options(url)
 
     configuration = config.get_section(config.config_ini_section, {})
     configuration["sqlalchemy.url"] = url

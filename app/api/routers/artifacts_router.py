@@ -427,7 +427,7 @@ async def download_artifact(
             wf_result = await db.execute(
                 select(Workflow).where(Workflow.id_hash == pl.workflow_hash)
             )
-            await enforce_portal_access(wf_result.scalar_one_or_none(), request)
+            await enforce_portal_access(wf_result.scalar_one_or_none(), request, db)
             return JSONResponse(
                 content=pl.geojson_data,
                 headers={"Content-Disposition": f'attachment; filename="{pl.layer_key}.geojson"'},

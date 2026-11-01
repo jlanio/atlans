@@ -167,7 +167,15 @@ ui_stage() {  # <key>
 # ui_run <label> <command...>: runs the command with its output in a log file,
 # a spinner while it runs and, at the end, ✓ or ✗ with the time it took. On a
 # failure the last lines of the log go to the screen. Returns the command's code.
-UI_LOG="${TMPDIR:-/tmp}/atlans-$$.log"
+# The log comes from mktemp: a name nobody can guess and a file born 0600.
+# bootstrap.sh and up.sh run as root on servers; the fixed /tmp/atlans-<pid>.log
+# could be planted beforehand as a symlink (the write as root followed it), and
+# with the default umask it was readable by every user of the host — it holds
+# the output of the database, CA and migration commands.
+UI_LOG="$(mktemp "${TMPDIR:-/tmp}/atlans.XXXXXX")" || {
+    printf 'atlans: mktemp falhou em %s\n' "${TMPDIR:-/tmp}" >&2
+    exit 1
+}
 # On the way out, even on Ctrl+C: the cursor back, the log and the files
 # registered with ui_cleanup (temporary secrets) gone.
 UI_CLEAN=""

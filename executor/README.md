@@ -44,8 +44,11 @@ The web panel's enrollment screen ("Executores" → the executor → enroll) sho
 ready-made command, with the installation's addresses:
 
 ```bash
-curl -fsSL https://<site>/executores/install | bash -s -- --executor-id=<ID> --otp=<OTP>
+curl -fsSL https://<site>/executores/install | bash -s -- --executor-id=<ID>
 ```
+
+Without `--otp`, the script asks for the code without echoing it, so it never appears in
+`ps` or in the shell history (`--otp=<OTP>` still works, but puts the code on the command line).
 
 Requirements on the machine: `docker` (with the `compose` plugin), `git` and `curl`; the
 script checks for them. It clones the repository (`--repo`, default: the one the server
@@ -101,7 +104,8 @@ you edit, are the `.in` files next to them. To regenerate the locks: `python scr
 ### 2. Enroll
 
 ```bash
-python -m executor enroll     --executor-id=<ID> --otp=<OTP> --server=https://agents.<dominio>
+read -rs OTP && printf '%s\n' "$OTP" | python -m executor enroll \
+    --executor-id=<ID> --otp-stdin --server=https://agents.<dominio>
 ```
 
 The command generates the Ed25519 key pair, sends the CSR, receives and persists the mTLS certificate,
@@ -120,12 +124,8 @@ OTP). The code is single-use and valid for 24 hours.
 > the desktop app, which captures the pipes. In all three, the wizard blew up with `EOFError`
 > instead of the useful message.
 
-> The OTP can go through **stdin** instead of argv, which avoids exposing it on the process's
-> command line:
->
-> ```bash
-> echo "<OTP>" | python -m executor enroll --otp-stdin --executor-id=<ID> --server=<URL>
-> ```
+> The OTP goes through **stdin** (`--otp-stdin`) so it is not exposed on the process's command
+> line (`ps`). `--otp=<OTP>` is still accepted, at that cost.
 
 ---
 
@@ -434,14 +434,15 @@ code. Write to `/data/certs`:
 # The image: built from here (`docker compose -f docker-compose.executor.yml build`)
 # or loaded from the release asset (`docker load < atlans-executor-docker-amd64.tar.gz`).
 mkdir executor-certs
-docker run --rm \
+read -rs OTP
+docker run --rm -i \
   -v $(pwd)/executor-certs:/data/certs \
   atlans-executor:latest \
-  python -m executor enroll --executor-id=<ID> --otp=<OTP> \
-    --cert-dir=/data/certs --server=https://agents.<dominio>
+  python -m executor enroll --executor-id=<ID> --otp-stdin \
+    --cert-dir=/data/certs --server=https://agents.<dominio> <<< "$OTP"
 ```
 
-`-it` is not needed: the enrollment is not interactive. Then mount
+`-i` forwards stdin (the OTP); `-t` is not needed: the enrollment is not interactive. Then mount
 `./executor-certs` on `/data/certs` in the compose file (or generate the certs directly in the
 `executor-data` volume, without a bind).
 
@@ -750,8 +751,8 @@ The server uses this information to decide which executor to dispatch the next j
 > `.env` does not exist or is incomplete — the expected path appears in the message
 > itself, and it honors `EXECUTOR_ENV_PATH`.
 >
-> `python -m executor enroll --executor-id=<ID> --otp=<OTP>
-> --server=https://agents.<dominio>`, or set `EXECUTOR_ID` in the `.env` mounted
+> `python -m executor enroll --executor-id=<ID> --otp-stdin
+> --server=https://agents.<dominio>` (the OTP on stdin), or set `EXECUTOR_ID` in the `.env` mounted
 > in the container. In the desktop app, the binding form does this through the interface.
 
 ---
@@ -793,7 +794,7 @@ The server uses this information to decide which executor to dispatch the next j
 > - The executor was reconfigured pointing to another key
 >
 > **Solution:** redo the enrollment (`python -m executor enroll --executor-id=<ID>
-> --otp=<OTP> --server=<URL>`) — it generates a new pair and registers the public key on the
+> --otp-stdin --server=<URL>`, the OTP on stdin) — it generates a new pair and registers the public key on the
 > server. The executor **never** generates or re-registers the key on its own: if
 > `x25519_key.pem` is missing, it fails at boot asking for a new enrollment. Deleting the
 > key and restarting does **not** fix it. In the desktop app, use **Refazer enrollment**.

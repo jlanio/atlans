@@ -104,3 +104,72 @@ def test_forwarded_for_forged_by_direct_client_is_ignored(with_trusted_proxy):
     """Without this, anyone could switch identity on every request and the rate
     limit would never trigger."""
     assert trusted_proxy.get_client_ip("203.0.113.9", "1.2.3.4") == "203.0.113.9"
+
+
+# ── MTLS_PROXIES: Traefik alone presents the cert header ─────────────────────
+#
+# TRUSTED_PROXIES (172.16.0.0/12 in the compose file) covers every container on
+# the Docker networks: the web, MinIO, step-ca could all present the header. It
+# cannot simply shrink to Traefik — the web container's /terra proxy forwards
+# the client's XFF and has to stay trusted for that — so the cert header gets
+# its own list.
+
+TRAEFIK = "172.18.255.254"
+WEB = "172.18.0.7"
+
+
+@pytest.fixture
+def so_o_traefik(monkeypatch, with_trusted_proxy):
+    import ipaddress
+    monkeypatch.setattr(trusted_proxy, "MTLS_PROXIES", [ipaddress.ip_network(f"{TRAEFIK}/32")])
+
+
+def test_only_traefik_may_present_the_cert_header(so_o_traefik):
+    assert_request_from_trusted_proxy(TRAEFIK, "/ws/executores/x")
+    with pytest.raises(HTTPException) as exc:
+        assert_request_from_trusted_proxy(WEB, "/ws/executores/x")
+    assert exc.value.status_code == 401
+
+
+def test_the_web_still_forwards_the_client_ip(so_o_traefik):
+    """The narrowing is the cert header's only: the rate limit key via /terra
+    stays the client's, not the web container's."""
+    assert trusted_proxy.get_client_ip(WEB, "198.51.100.7") == "198.51.100.7"
+
+
+def test_without_mtls_proxies_the_header_follows_trusted_proxies(with_trusted_proxy, monkeypatch):
+    monkeypatch.setattr(trusted_proxy, "MTLS_PROXIES", None)
+    assert_request_from_trusted_proxy(WEB, "/internal/send-email")
+    with pytest.raises(HTTPException):
+        assert_request_from_trusted_proxy("203.0.113.9", "/internal/send-email")
+
+
+def test_mtls_proxies_with_no_valid_entry_accepts_no_one(monkeypatch):
+    """Fail-closed: a typo must not turn the check off, as an empty
+    TRUSTED_PROXIES does in dev."""
+    monkeypatch.setattr(trusted_proxy, "TRUSTED_PROXIES", [])
+    monkeypatch.setattr(trusted_proxy, "MTLS_PROXIES", [])
+    with pytest.raises(HTTPException):
+        assert_request_from_trusted_proxy(TRAEFIK, "/qualquer")
+
+
+@pytest.mark.parametrize("valor, esperado", [
+    (None, None),                                   # absent: TRUSTED_PROXIES decides
+    ("", None),                                     # empty: the same
+    ("172.18.255.254", ["172.18.255.254/32"]),
+    ("lixo", []),                                   # set but invalid: nobody
+])
+def test_mtls_proxies_is_read_from_the_environment(monkeypatch, valor, esperado):
+    import importlib
+
+    if valor is None:
+        monkeypatch.delenv("MTLS_PROXIES", raising=False)
+    else:
+        monkeypatch.setenv("MTLS_PROXIES", valor)
+    try:
+        modulo = importlib.reload(trusted_proxy)
+        lido = None if modulo.MTLS_PROXIES is None else [str(r) for r in modulo.MTLS_PROXIES]
+        assert lido == esperado
+    finally:
+        monkeypatch.undo()
+        importlib.reload(trusted_proxy)

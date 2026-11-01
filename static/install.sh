@@ -418,11 +418,12 @@ docker compose -f docker-compose.executor.yml build
 # ── 7. Enrollment + start ──────────────────────────────────────────────────────
 _INSTALL_STAGE="enroll"
 say "[7/7] Executando enrollment e subindo o executor..."
-# -T: disables TTY and stdin forwarding.
-# </dev/null: closes stdin explicitly. Without it, in some environments
-# `docker compose run` consumes the rest of the curl|bash pipe and the script
-# ends without reaching the final `up -d` (reported bug).
-docker compose -f docker-compose.executor.yml run --rm -T \
+# -T: disables TTY allocation.
+# stdin is the OTP and nothing else: `printf` is a shell builtin, so the OTP
+# never shows up in `ps` (as `--otp=...` did, both on the host and in the
+# container), and the pipe keeps `docker compose run` from consuming the rest
+# of the curl|bash pipe (the reported bug the old `</dev/null` fixed).
+printf '%s\n' "$OTP" | docker compose -f docker-compose.executor.yml run --rm -T \
     --entrypoint "" \
     -v "$(pwd)/executor-certs/atlans-root.crt:/atlans-root.crt:ro" \
     -v "$(pwd)/executor/.env:/app/executor/.env" \
@@ -436,13 +437,11 @@ docker compose -f docker-compose.executor.yml run --rm -T \
     executor \
     python -m executor enroll \
         --executor-id="$EXECUTOR_ID" \
-        --otp="$OTP" \
+        --otp-stdin \
         --server="$SERVER" \
-        --cert-dir=/data/certs \
-    </dev/null
+        --cert-dir=/data/certs
 
-# Zeroes the OTP in the shell's memory (placebo — it may have leaked in ps aux,
-# see Wave 2 for the definitive fix with --otp-file)
+# Zeroes the OTP in the shell's memory.
 OTP=""
 
 ok "Enrollment concluido."

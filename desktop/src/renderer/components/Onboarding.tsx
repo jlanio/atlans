@@ -22,6 +22,7 @@ import { cn } from '../lib/utils.js'
 const REMEDY: Record<string, string> = {
   otp_ausente: 'O OTP não chegou ao processo de enrollment. Tente novamente.',
   executor_id_ausente: 'Informe o ID do executor, copiado do painel web.',
+  enroll_em_andamento: 'Já há um enrollment em andamento nesta máquina. Aguarde o resultado dele antes de tentar de novo.',
   enroll_recusado: 'O servidor recusou o enrollment. Confira se o OTP não expirou (validade de 24 h, uso único) e se o ID do executor está correto.',
   signing_key_conflict: 'O certificado foi emitido, mas a chave de assinatura deste servidor não confere com a já fixada nesta máquina. Isso costuma indicar que o executor foi enrolado antes contra outro servidor — apague a pasta de certificados e refaça.',
   saida_invalida: 'O enrollment terminou de forma inesperada. O log abaixo tem o detalhe.',
@@ -87,9 +88,15 @@ export function Onboarding({
   }, [config.executorId])
 
   // Deep link: what arrived before mounting (invoke) and what arrives after (push).
+  // A push RECEIVED here also clears the main process's kept copy (the invoke
+  // consumes it): kept, it came back on the next Onboarding within 10 minutes
+  // — after enrolling with it, or after "Ignorar" — with an already used OTP.
   useEffect(() => {
     void window.atlas.deepLinkPendente().then((p) => { if (p) setLinkRequest(p) })
-    return window.atlas.aoReceberDeepLink(setLinkRequest)
+    return window.atlas.aoReceberDeepLink((pedido) => {
+      setLinkRequest(pedido)
+      void window.atlas.deepLinkPendente()
+    })
   }, [])
 
   const podeEnviar = executorId.trim() && otp.trim() && !enviando

@@ -813,7 +813,7 @@ async def main():
         keep the executor from operating.
         """
         try:
-            pending = await asyncio.to_thread(result_store.load_pending)
+            pending = await asyncio.to_thread(result_store.load_for_boot_replay)
         except Exception as exc:
             logger.warning("Falha ao restaurar resultados pendentes (ignorando): %s", exc)
             return
@@ -849,6 +849,10 @@ async def main():
             "status": "cancelled",
             "error": motivo,
         }
+        if message.get("cancel_as_executor_loss"):
+            # Abandoned by a shutdown past its deadline: nobody canceled it. A
+            # failure the server can tell apart (and that may be retried).
+            result.update({"status": "error", "error_category": "executor_lost", "retryable": True})
         result_store.put(result)
         _enqueue_result(result)
         # Covers the job canceled BEFORE starting (drained from the queue on shutdown):
@@ -1206,10 +1210,13 @@ async def main():
         sys.exit(1)  # Docker restart: on-failure → reinicia o container
 
     if conn.terminal_deny:
-        # Code != 0 for Docker's supervisor too: `restart: on-failure`
-        # restarts, but the operator sees the reason in the log instead of a silent
-        # exit 0 that suggests a normal shutdown.
-        sys.exit(1)
+        # In a container, exit 0: the compose file uses `restart: on-failure`,
+        # and a 1 here restarted a revoked executor forever (a full boot and
+        # mTLS handshake per Docker backoff, ~1/min), against a server that had
+        # already said no. The reason is in the log line above. Outside a
+        # container the desktop supervisor reads the `failed` phase and stops;
+        # the 1 stays for it and for anything that only looks at the code.
+        sys.exit(0 if _in_container() else 1)
 
 
 if __name__ == "__main__":

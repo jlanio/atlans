@@ -66,7 +66,7 @@ import ReactFlowComponent from "@/app/components/workflow"
 import { FlowContextProvider, INodeContext } from "@/context/useFlowContext"
 import { useWorkflowCatalogStore } from "@/app/stores/workflowCatalogStore"
 import { useWorkflowSaveStore } from "@/app/stores/workflowSaveStore"
-import { buildGraphPayload, useSaveWorkflow } from "@/app/hooks/workflow/useSaveWorkflow"
+import { buildGraphPayload, useSaveWorkflow, type SaveResult } from "@/app/hooks/workflow/useSaveWorkflow"
 import { buildNodes } from "@/app/components/workflow/utils/build-canvas"
 import type { INodesAPI, INodesDefinition, IWorkflow } from "@/service/types"
 
@@ -221,6 +221,27 @@ describe("Ctrl+S no editor enquanto o workflow carrega", () => {
     expect(nosDoPut()).toEqual(["X", "Y"])
   })
 
+  it("resposta atrasada do workflow anterior hidratada sob a rota nova: o save recusa", async () => {
+    // The page now discards a late answer for the previous id; this is the
+    // defense in depth behind it. If wf-1's answer (a NEW object) still lands
+    // after the route moved to wf-2, the canvas hydrates wf-1's graph — and the
+    // PUT, addressed by the route id, would write it over wf-2.
+    const { trocarWorkflow } = montar(workflow("wf-1", ["A", "B"]))
+    await esperar()
+
+    rota.params = { id: "wf-2" }
+    trocarWorkflow(workflow("wf-1", ["A", "B"]))
+    await esperar()
+    expect(nos()).toEqual(["A", "B"])
+    adicionarNo("C")
+    await esperar()
+    ctrlS()
+    await esperar()
+
+    expect(servico.updateWorkflowById).not.toHaveBeenCalled()
+    expect(toasts.avisos).toEqual(["Aguarde o workflow carregar para salvar"])
+  })
+
   it("um workflow que abriu vazio salva os primeiros nós", async () => {
     montar(workflow("wf-1", []))
     await esperar()
@@ -259,7 +280,9 @@ describe("o save de qualquer chamador", () => {
     ({ id, position: { x: 0, y: 0 }, data: { name: "Buffer", alias: id, type: "spatial", properties: {} } }) as INodeContext
 
   beforeEach(() => {
-    useWorkflowSaveStore.setState({ isSaving: false, saveStatus: "idle", workflowName: "Fluxo", lastError: null })
+    useWorkflowSaveStore.setState({
+      isSaving: false, saveStatus: "idle", workflowName: "Fluxo", lastError: null, canvasWorkflowId: null,
+    })
   })
 
   it("o save silencioso do Executar também espera o canvas hidratar", async () => {
@@ -268,13 +291,54 @@ describe("o save de qualquer chamador", () => {
     useWorkflowSaveStore.setState({ lastSavedSnapshot: null, canvasHidratado: false })
     const { result } = montarSave()
 
-    await act(async () => { await result.current.salvar.saveWorkflow({ silent: true }) })
+    let resposta: SaveResult | undefined
+    await act(async () => { resposta = await result.current.salvar.saveWorkflow({ silent: true }) })
 
     expect(servico.updateWorkflowById).not.toHaveBeenCalled()
     expect(useWorkflowSaveStore.getState().saveStatus).toBe("idle")
     // Executar answers for itself; a "wait for it to load" here would be noise
-    // on top of its own message.
+    // on top of its own message. For that it must be able to tell this apart
+    // from a save that happened: it used to dispatch the run on top of it.
     expect(toasts.avisos).toEqual([])
+    expect(resposta).toMatchObject({ outcome: "skipped", skipReason: "not_hydrated" })
+  })
+
+  it("o save que não gravou nada diz isso: Executar não pode tomá-lo por salvo", async () => {
+    const { nodesReq, edgesReq } = buildGraphPayload([no("A")], [])
+    useWorkflowSaveStore.getState().initSnapshot(nodesReq, edgesReq, "Fluxo")
+    const { result } = montarSave()
+    act(() => { result.current.canvas.getState().setNodes([no("A"), no("B")]) })
+
+    // A Ctrl+S still in flight.
+    useWorkflowSaveStore.setState({ isSaving: true })
+    let resposta: SaveResult | undefined
+    await act(async () => { resposta = await result.current.salvar.saveWorkflow({ silent: true }) })
+    expect(resposta).toMatchObject({ outcome: "skipped", skipReason: "in_flight" })
+
+    // No name yet.
+    useWorkflowSaveStore.setState({ isSaving: false, workflowName: "" })
+    await act(async () => { resposta = await result.current.salvar.saveWorkflow({ silent: true }) })
+    expect(resposta).toMatchObject({ outcome: "skipped", skipReason: "needs_name" })
+
+    // The canvas holds another workflow's graph than the route's.
+    useWorkflowSaveStore.setState({ workflowName: "Fluxo", canvasWorkflowId: "wf-outro" })
+    await act(async () => { resposta = await result.current.salvar.saveWorkflow({ silent: true }) })
+    expect(resposta).toMatchObject({ outcome: "skipped", skipReason: "not_hydrated" })
+
+    expect(servico.updateWorkflowById).not.toHaveBeenCalled()
+  })
+
+  it("nada a gravar conta como salvo: o servidor já tem o canvas", async () => {
+    const { nodesReq, edgesReq } = buildGraphPayload([no("A")], [])
+    useWorkflowSaveStore.getState().initSnapshot(nodesReq, edgesReq, "Fluxo")
+    const { result } = montarSave()
+    act(() => { result.current.canvas.getState().setNodes([no("A")]) })
+
+    let resposta: SaveResult | undefined
+    await act(async () => { resposta = await result.current.salvar.saveWorkflow({ silent: true }) })
+
+    expect(servico.updateWorkflowById).not.toHaveBeenCalled()
+    expect(resposta?.outcome).toBe("saved")
   })
 
   it("sem snapshot de referência, um grafo vazio não sobrescreve um workflow existente", async () => {
@@ -293,9 +357,11 @@ describe("o save de qualquer chamador", () => {
     const { result } = montarSave()
     act(() => { result.current.canvas.getState().setNodes([no("A"), no("B")]) })
 
-    await act(async () => { await result.current.salvar.saveWorkflow({ silent: true }) })
+    let resposta: SaveResult | undefined
+    await act(async () => { resposta = await result.current.salvar.saveWorkflow({ silent: true }) })
 
     expect(servico.updateWorkflowById).toHaveBeenCalledTimes(1)
     expect(nosDoPut()).toEqual(["A", "B"])
+    expect(resposta?.outcome).toBe("saved")
   })
 })

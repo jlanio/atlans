@@ -125,6 +125,8 @@ class SendEmailNode(BaseNode):
       - "auto": saves the GeoDataFrame as an artifact in MinIO and includes a link in the e-mail
     """
 
+    TEM_EFEITO_COLATERAL = True
+
     @classmethod
     def description(cls) -> Dict[str, Any]:
         return {
@@ -292,7 +294,9 @@ class SendEmailNode(BaseNode):
 
     def _build_artifact_html(self, artifact_ref: str, filename: str | None = None) -> str:
         """Generates an HTML block with the artifact's download link."""
-        display_name = filename or artifact_ref.split("/")[-1] if "/" in artifact_ref else artifact_ref
+        # Parenthesized: `a or b if c else d` parses as `(a or b) if c else d`,
+        # which dropped `filename` whenever the reference had no "/".
+        display_name = filename or (artifact_ref.split("/")[-1] if "/" in artifact_ref else artifact_ref)
 
         if artifact_ref.startswith("http://") or artifact_ref.startswith("https://"):
             download_link = artifact_ref

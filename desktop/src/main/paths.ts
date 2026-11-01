@@ -99,26 +99,77 @@ export const LOG_DIR = path.join(USER_DATA, 'logs')
  */
 export const ARTIFACTS_DIR_PADRAO = path.join(app.getPath('home'), 'AtlansExecutor', 'artifacts')
 
+// The migration carries over `certs/`, `config/` and `logs/`. The rest of an
+// old folder is Chromium's (cache, Preferences, Local Storage), which rebuilds itself.
+
+/** What `migrateLegacyData` moved, for the log to say exactly that. */
+export interface LegacyMigration { origem: string; movidas: string[] }
+
+/** A slot is free when it does not exist or is an EMPTY folder (`ensureDirectories` leaves those). */
+function slotLivre(p: string): boolean {
+  try {
+    return !fs.existsSync(p) || (fs.statSync(p).isDirectory() && fs.readdirSync(p).length === 0)
+  } catch {
+    return false
+  }
+}
+
+/** Moves `origem/sub` into the new folder if the slot is free. True if it moved. */
+function moverSubpasta(origem: string, sub: string): boolean {
+  const de = path.join(origem, sub)
+  const para = path.join(USER_DATA, sub)
+  if (!fs.existsSync(de) || !slotLivre(para)) return false
+  try {
+    fs.mkdirSync(USER_DATA, { recursive: true })
+    // An empty folder in the slot is a leftover, not data: rename does not
+    // replace a folder on every platform.
+    if (fs.existsSync(para)) fs.rmdirSync(para)
+    fs.renameSync(de, para)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
  * Moves the data from a folder with an old name, if there is one. Idempotent.
  *
- * Runs before `ensureDirectories`: once the directories exist, the migration
- * becomes a no-op (it does not overwrite current data with the old data).
+ * Keyed on the app's OWN data (`config/`, `certs/`), not on the userData
+ * folder itself: Chromium creates that folder before `whenReady` (the
+ * single-instance lockfile, `Network/`, `Preferences`), and checking it made
+ * the migration a permanent no-op — the user lost the certificate the
+ * migration exists to keep. An EMPTY `config/` or `certs/` counts as absent:
+ * that is what `ensureDirectories` left behind on a release where the
+ * migration did not run, and keying on the folders alone stranded those users.
+ *
+ * Only an old folder holding a certificate is taken, and `certs/` and
+ * `config/` move TOGETHER: the certificate of one enrollment next to the
+ * `EXECUTOR_ID` of another is a machine that can no longer connect. If the
+ * second one cannot move, the first goes back. Current data is never
+ * overwritten: a slot with anything in it stops the migration. `logs/` is a
+ * bonus and moves only if its slot is free.
+ *
+ * Runs before `ensureDirectories`.
  */
-export function migrateLegacyData(): string | null {
-  if (fs.existsSync(USER_DATA)) return null
+export function migrateLegacyData(): LegacyMigration | null {
+  if (!slotLivre(CONFIG_DIR) || !slotLivre(CERT_DIR)) return null
 
   const raiz = path.dirname(USER_DATA)
   for (const antigo of NOMES_ANTIGOS) {
     const origem = path.join(raiz, antigo)
-    if (origem === USER_DATA || !fs.existsSync(origem)) continue
-    try {
-      fs.renameSync(origem, USER_DATA)
-      return antigo
-    } catch {
-      // Folder in use, or permissions. Not fatal: the app goes on with the new,
-      // empty folder and the user redoes the link.
+    if (origem === USER_DATA || !fs.existsSync(path.join(origem, 'certs', 'cert.pem'))) continue
+    if (!moverSubpasta(origem, 'certs')) return null
+    const movidas = ['certs']
+    if (fs.existsSync(path.join(origem, 'config'))) {
+      if (!moverSubpasta(origem, 'config')) {
+        // Half a pair is worse than none: put the certificate back.
+        try { fs.renameSync(path.join(USER_DATA, 'certs'), path.join(origem, 'certs')) } catch { /* left as is */ }
+        return null
+      }
+      movidas.push('config')
     }
+    if (moverSubpasta(origem, 'logs')) movidas.push('logs')
+    return { origem: antigo, movidas }
   }
   return null
 }

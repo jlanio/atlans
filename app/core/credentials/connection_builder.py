@@ -24,9 +24,29 @@ def build_connection_data(cred_type: str, data: dict) -> dict:
     return result
 
 
+def porta_valida(valor) -> int | None:
+    """The port as an int in 1–65535, or None. A port is a number: interpolated
+    as text, `5432/x?sslmode=disable` injected options into the DSN."""
+    if isinstance(valor, bool):
+        return None
+    try:
+        porta = int(str(valor).strip())
+    except (TypeError, ValueError):
+        return None
+    return porta if 1 <= porta <= 65535 else None
+
+
+def _porta(data: dict, padrao: int) -> str:
+    bruto = data.get("port")
+    if bruto in (None, ""):
+        return str(padrao)
+    porta = porta_valida(bruto)
+    return str(porta if porta is not None else padrao)
+
+
 def _build_postgres_dsn(data: dict) -> str:
     host = quote_plus(data.get("host", "localhost"))
-    port = data.get("port", "5432") or "5432"
+    port = _porta(data, 5432)
     database = quote_plus(data.get("database", ""))
     user = quote_plus(data.get("user", ""))
     password = quote_plus(data.get("password", ""))
@@ -35,7 +55,7 @@ def _build_postgres_dsn(data: dict) -> str:
 
 def _build_mysql_dsn(data: dict) -> str:
     host = quote_plus(data.get("host", "localhost"))
-    port = data.get("port", "3306") or "3306"
+    port = _porta(data, 3306)
     database = quote_plus(data.get("database", ""))
     user = quote_plus(data.get("user", ""))
     password = quote_plus(data.get("password", ""))
