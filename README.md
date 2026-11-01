@@ -119,6 +119,16 @@ How the local executor works, and how to start it over: [docs/reference.md](docs
 
 For the curious: the API is written in Python with FastAPI, the editor in Next.js and React Flow, data lives in PostgreSQL + PostGIS, files in MinIO (S3-compatible), and Valkey (Redis-compatible) carries live events. Executors connect over WebSocket with mutual TLS, and every job they receive is encrypted and signed. The details are in the [technical reference](docs/reference.md).
 
+## Support
+
+Pick the form that fits on the [issue tracker](https://github.com/jlanio/atlans/issues/new/choose):
+
+- **Questions**: how to do something, or whether Atlans can do it. Use the [Question](https://github.com/jlanio/atlans/issues/new?template=question.yml) form.
+- **Bugs**: something does not work as it should. Use the [Bug report](https://github.com/jlanio/atlans/issues/new?template=bug.yml) form.
+- **Ideas**: a new feature or an improvement. Use the [Feature request](https://github.com/jlanio/atlans/issues/new?template=feature_request.yml) form.
+
+Security problems never go in a public issue: report them privately as described in [SECURITY.md](SECURITY.md).
+
 ## Contributing
 
 Ideas, bug reports and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the contributor agreement, [CLA.md](CLA.md). Found a security issue? Please report it privately as described in [SECURITY.md](SECURITY.md).
