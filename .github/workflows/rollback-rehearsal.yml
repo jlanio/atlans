@@ -1,0 +1,104 @@
+name: Rollback rehearsal
+
+# The rollback, executed for real (scripts/rollback-rehearsal.sh): the previous
+# version goes up on an empty database, the new one migrates it, the previous one
+# comes back over the migrated database, and the pre-upgrade backup is restored into
+# a new database. Here because the hosts that prepare the releases have no Docker.
+#
+# It runs on the PRs that touch what decides the database's shape (or the rehearsal
+# itself) and by hand, with any pair of refs. No tag trigger, on purpose: the
+# rehearsal guards the PR, not the publication.
+on:
+  workflow_dispatch:
+    inputs:
+      old_ref:
+        description: "Versão anterior (ref ou SHA)"
+        required: false
+        default: "3bf789a"
+      new_ref:
+        description: "Versão nova (ref ou SHA; vazio = o commit deste run)"
+        required: false
+        default: ""
+  pull_request:
+    paths:
+      - "alembic/**"
+      - "scripts/init_schema.sql"
+      - "app/extensoes/**/schema.sql"
+      - "docs/operations.md"
+      - "scripts/rollback-rehearsal.sh"
+      - ".github/workflows/rollback-rehearsal.yml"
+
+# Same policy as ci.yml: read-only token, checkout without storing it, actions
+# pinned by SHA.
+permissions:
+  contents: read
+
+jobs:
+  rollback-rehearsal:
+    name: rollback-rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      # PostgreSQL 15 + PostGIS 3, the minimum the installation asks for
+      # (docs/self-hosting.md; the database is outside the compose). No password: the
+      # service only exists inside this job.
+      postgres:
+        image: postgis/postgis:15-3.4
+        env:
+          POSTGRES_DB: atlans
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      # The same image as the compose. The API starts without Redis, but with the
+      # background tasks failing in the log.
+      redis:
+        image: valkey/valkey:8-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      # The whole history: the script opens a worktree for each ref.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Lint (shellcheck)
+        run: shellcheck scripts/rollback-rehearsal.sh
+
+      # pg_dump/pg_restore of the same major version as the server: the runner's
+      # client is newer, and a newer dump is not guaranteed to restore into an
+      # older server.
+      - name: Cliente do PostgreSQL 15
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-15
+          echo "/usr/lib/postgresql/15/bin" >> "$GITHUB_PATH"
+
+      - name: Ensaio de rollback
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres@localhost:5432/atlans
+          REDIS_URL: redis://localhost:6379/0
+          OLD_REF: ${{ inputs.old_ref || '3bf789a' }}
+          NEW_REF: ${{ inputs.new_ref || 'HEAD' }}
+          PYTHON: python3.12
+          REHEARSAL_DIR: ${{ runner.temp }}/rehearsal
+          # No outbound calls to the source catalog's endpoints during the rehearsal.
+          FONTES_VERIFICACAO_INTERVAL: "0"
+        run: |
+          pg_dump --version
+          bash scripts/rollback-rehearsal.sh
