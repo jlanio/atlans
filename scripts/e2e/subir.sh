@@ -126,20 +126,29 @@ etapa "Bootstrap"
 upsert_env DATABASE_URL "postgresql+asyncpg://${PG_USER}:${PG_SENHA}@host.docker.internal:${PG_PORT}/${PG_DB}"
 unset PG_SENHA
 ok "DATABASE_URL do E2E gravado no .env"
-# step-ca runs as UID 1000 and reads this file with the host's owner and mode:
-# bootstrap.sh only fixes that as root. A CI runner is UID 1001, with sudo.
-SEGREDO=secrets/stepca_password.txt
-if [ "$(uname -s)" = "Linux" ] && [ "$(stat -c %u "$SEGREDO")" != "1000" ]; then
+# Two files born 600 and owned by whoever ran bootstrap are read, through a
+# bind mount, by containers that run as UID 1000: the step-ca reads its
+# password, and the API reads the .env (slowapi loads ./.env at import, and the
+# PermissionError there kills the API before it serves anything). bootstrap.sh
+# only fixes the first one, and only as root. A CI runner is UID 1001, with
+# sudo: give both to UID 1000, readable by our group. After the last write to
+# the .env above: upsert_env's `sed -i` gives the file back to us.
+dar_ao_uid_1000() {  # <file> <who reads it>
+    local arquivo="$1" quem="$2"
+    [ "$(uname -s)" = "Linux" ] || return 0
+    [ "$(stat -c %u "$arquivo")" != "1000" ] || return 0
     if sudo -n true 2>/dev/null; then
-        sudo chown "1000:$(id -g)" "$SEGREDO"
-        sudo chmod 640 "$SEGREDO"
-        ok "$SEGREDO legível pelo step-ca (UID 1000)"
+        sudo chown "1000:$(id -g)" "$arquivo"
+        sudo chmod 640 "$arquivo"
+        ok "$arquivo legível $quem (UID 1000)"
     else
-        erro "$SEGREDO não é do UID 1000 e não há sudo sem senha: o step-ca não vai ler a senha."
-        printf '      sudo chown 1000:%s %s && sudo chmod 640 %s\n' "$(id -g)" "$SEGREDO" "$SEGREDO" >&2
+        erro "$arquivo não é do UID 1000 e não há sudo sem senha: $quem não vai conseguir lê-lo."
+        printf '      sudo chown 1000:%s %s && sudo chmod 640 %s\n' "$(id -g)" "$arquivo" "$arquivo" >&2
         exit 1
     fi
-fi
+}
+dar_ao_uid_1000 secrets/stepca_password.txt "pelo step-ca"
+dar_ao_uid_1000 .env "pela API"
 
 # ── 4. Up ────────────────────────────────────────────────────────────────────
 etapa "Subindo a stack (up.sh dev, com o executor local)"

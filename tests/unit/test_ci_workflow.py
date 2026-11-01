@@ -92,6 +92,9 @@ def test_jobs_are_still_declared_with_the_usual_names():
     extensões (núcleo)" run the suites with the extensions deleted, as the free
     distribution runs them, in parallel jobs so as not to lengthen the ones above.
     Since then, "the six green".
+
+    "E2E (Playwright)" brings up the real stack (scripts/e2e/subir.sh) and runs
+    the browser tests on it; its name is a required check of main's ruleset.
     """
     jobs = yaml.safe_load(CI.read_text())["jobs"]
     nomes = {j.get("name", chave) for chave, j in jobs.items()}
@@ -104,6 +107,7 @@ def test_jobs_are_still_declared_with_the_usual_names():
         "Frontend (Next.js)",
         "Frontend sem extensões (núcleo)",
         "Desktop (typecheck + testes + lock)",
+        "E2E (Playwright)",
     }, f"os jobs do CI mudaram. Presentes: {sorted(nomes)}"
 
 
