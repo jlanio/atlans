@@ -34,8 +34,12 @@ describe("worker do maplibre-gl", () => {
 
     const worker = path.join(WEB, "public", url)
     expect(existsSync(worker), worker).toBe(true)
-    const importados = [...readFileSync(worker, "utf8").matchAll(/\bfrom\s*["'`]\.\/([^"'`]+)["'`]/g)].map((m) => m[1])
-    expect(importados.length).toBeGreaterThan(0)
+    const codigo = readFileSync(worker, "utf8")
+    expect(codigo.length, worker).toBeGreaterThan(0)
+    // Up to maplibre-gl 6.13 the worker imported `./maplibre-gl-shared.mjs`;
+    // from 6.14 on it is a single file and imports nothing. Either way, every
+    // relative import (static or dynamic) must be served next to it.
+    const importados = [...codigo.matchAll(/(?:\bfrom|\bimport\s*\(?)\s*["'`]\.\/([^"'`]+)["'`]/g)].map((m) => m[1])
     for (const arquivo of importados) {
       expect(existsSync(path.join(path.dirname(worker), arquivo)), arquivo).toBe(true)
     }

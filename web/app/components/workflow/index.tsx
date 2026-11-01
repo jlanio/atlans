@@ -237,6 +237,12 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
     snapshotTimerRef.current = setTimeout(saveSnapshot, 300)
   }, [saveSnapshot])
 
+  // A snapshot still pending when the editor unmounts has no canvas left to
+  // record: cancel it, so it does not fire into an unmounted tree.
+  useEffect(() => () => {
+    if (snapshotTimerRef.current) clearTimeout(snapshotTimerRef.current)
+  }, [])
+
   const handleNodesChange = useCallback((changes: Parameters<typeof onNodesChange>[0]) => {
     onNodesChange(changes)
     // Only saves a snapshot on structural changes (add/remove/reposition after drag)
