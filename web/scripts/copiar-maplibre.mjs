@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // web/scripts/copiar-maplibre.mjs
 //
-// Copies the MapLibre worker (`maplibre-gl-worker.mjs` and the
-// `maplibre-gl-shared.mjs` it imports) from `node_modules/maplibre-gl/dist`
+// Copies the MapLibre worker (`maplibre-gl-worker.mjs`, and the
+// `maplibre-gl-shared.mjs` it imported up to 6.13 — from 6.14 on the worker is
+// a single file and `shared` ships empty) from `node_modules/maplibre-gl/dist`
 // to `public/maplibre`. MapLibreMap points `setWorkerUrl` there.
 //
 // Why: maplibre-gl 6 ships only as ESM and runs the worker from a URL. With a
