@@ -1,5 +1,7 @@
 import { FieldLabel } from "./field-label"
-import { githubDarkTheme, JsonEditor } from "json-edit-react"
+import { JsonEditor } from "json-edit-react"
+// json-edit-react 2 moved the ready-made themes to their own package.
+import { githubDarkTheme } from "@json-edit-react/themes"
 import type { FieldProps } from "./types"
 
 type ObjectFieldProps = FieldProps
@@ -20,7 +22,7 @@ const ObjectField = ({ field, values, setNodeField }: ObjectFieldProps) => {
         indent={1}
         theme={githubDarkTheme}
         className="border !rounded-sm"
-        enableClipboard={false}
+        showClipboardButton={false}
         showCollectionCount={false}
         rootName="json"
         setData={value => {
