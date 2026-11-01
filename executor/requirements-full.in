@@ -19,21 +19,21 @@
 # (python scripts/travar_python.py).
 
 # ── Comunicacao ──────────────────────────────────────────────────────────────
-websockets==17.1
+websockets==17.2
 httpx==0.28.1
 
 # ── Criptografia ─────────────────────────────────────────────────────────────
-cryptography==50.0.1
+cryptography==50.0.2
 
 # ── Configuracao ─────────────────────────────────────────────────────────────
-python-dotenv==1.2.3
+python-dotenv==1.2.4
 
 # ── GIS — spatial/ nodes ─────────────────────────────────────────────────────
 # geopandas 1.x uses pyogrio as the vector I/O engine (read_file/to_file),
 # including Shapefile. `fiona` was removed: it was a second copy of GDAL in the
 # bundle and there wasn't a single `import fiona` in the code.
-geopandas==1.1.4
-shapely==2.1.2
+geopandas==1.2.0
+shapely==2.2.0
 pyproj==3.8.0
 pyogrio==0.13.0
 # numpy and pandas come in through geopandas. Pinned during the switch to
@@ -62,8 +62,8 @@ OWSLib==0.36.0
 geopy==2.5.0
 
 # ── Database — database_query / save_to_postgis nodes ────────────────────────
-asyncpg==0.31.0
-sqlalchemy==2.0.54
+asyncpg==0.32.0
+sqlalchemy==2.1.5
 geoalchemy2==0.20.0
 psycopg2-binary==2.9.13
 
@@ -74,14 +74,14 @@ croniter==6.2.4
 python-dateutil==2.9.0.post0
 
 # ── Storage MinIO/S3 — upload de artefatos ───────────────────────────────────
-boto3==1.43.98
+boto3==1.43.114
 
 # ── GeoSync — monitoramento e filtragem de arquivos ──────────────────────────
 watchdog==6.0.0
 pathspec==1.1.1
 
 # ── Cache e utilidades ───────────────────────────────────────────────────────
-cachetools==7.2.0
+cachetools==7.2.3
 psutil==7.2.2
 redis==8.1.0
 
