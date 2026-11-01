@@ -352,6 +352,11 @@ git rebase origin/main
 # 4. Open the PR when it is ready
 ```
 
+`main` is protected by a ruleset: direct pushes are blocked, and a PR only
+merges with the CI checks and `Revisão (QA)` green. The day-to-day flow, how to
+apply the ruleset and the emergency path are in
+[docs/revisao-obrigatoria.md](docs/revisao-obrigatoria.md).
+
 ### Conventional Commits
 
 All commits must follow the [Conventional Commits](https://www.conventionalcommits.org/) standard:

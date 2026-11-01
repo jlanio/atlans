@@ -44,6 +44,8 @@
 - [ ] Documentation updated where it made sense
 - [ ] First PR: I have accepted the CLA (CLA.md and CONTRIBUTING.md, at the repository root, explain how)
 
+Merging into `main` requires the `Revisão (QA)` check to be green, besides the CI ones (docs/revisao-obrigatoria.md).
+
 ## Evidence
 
 <!-- Screenshots or a recording for UI changes (web/desktop); logs/output for everything else. -->
