@@ -138,6 +138,18 @@ pre-commit install
 After that, `git commit` runs the hooks automatically. To run them
 manually on all files: `pre-commit run --all-files`.
 
+`pre-commit install` also installs a `commit-msg` hook, `no-agent-attribution`
+(`scripts/atribuicao_commits.py`). It refuses a commit message with a
+`Co-Authored-By:` trailer naming an AI agent or a bot (Claude, Copilot, Codex,
+`[bot]`...), a tool footer (`Generated with Claude...`) or a `claude.ai/code`
+link. It is the owner's rule: every commit in this repository is theirs, under
+`jlanio <lanio.morais@gmail.com>`; a human co-author is fine. In a clone where
+`pre-commit install` ran before this hook existed, run it again: otherwise
+`.git/hooks/commit-msg` is not there and the check never runs. CI's
+`Atribuição (commits e PR)` job runs the same script on every commit of the
+PR, and also checks the author e-mail, the branch (no `claude/`, `copilot/`,
+`codex/`, `cursor/`, `agent/` or `devin/` prefix), the title and the body.
+
 If detect-secrets flags a false positive (example key in a test
 fixture, legitimate SHA-256 hash), there are two options:
 
@@ -337,9 +349,10 @@ atlans/
 
 ```bash
 # 1. Create a branch from main
-# Repo convention: the commit type + a short slug (e.g. feat/dashboard-periodo).
+# Repo convention: to/<assunto>, a short slug (e.g. to/toasts-fora-do-painel).
+# Never an agent prefix (claude/, copilot/...): CI refuses it.
 git checkout main && git pull
-git checkout -b feat/nome-da-funcionalidade
+git checkout -b to/<assunto>
 
 # 2. Develop and commit in small steps
 git add <arquivos>
@@ -873,6 +886,7 @@ async def test_buffer_executa_com_distancia():
 | Job | What it runs |
 |---|---|
 | **Secrets scan (detect-secrets)** | `detect-secrets scan --baseline .secrets.baseline` — fails if a new secret appears outside the baseline |
+| **Atribuição (commits e PR)** | PRs only: `python scripts/atribuicao_commits.py pr` — the author e-mail and the message of every commit in the PR, the branch, the title and the body follow the owner's attribution rule ("6. Pre-commit hooks") |
 | **Backend (Python)** | `pip install --require-hashes --only-binary=:all: -r requirements.txt -r requirements-dev.txt` → `ruff check .` → `pytest tests/ -v` (Python 3.12; includes `test_locks_python.py`, which checks the locks). There is no Python formatter in the CI |
 | **Backend without extensions (core)** | the same dependencies → `bash scripts/sem_extensoes.sh` (deletes `app/extensoes/<nome>/` and `tests/extensoes/`, the cut of the free distribution) → `pytest tests/ -q`: the server core on its own (`docs/architecture.md`, Extensions). With no extension at all in the repository (the public copy), the job ends at the "Há extensões?" (Are there extensions?) step: it would be identical to the one above |
 | **Dependency audit (informational)** | `scripts/idade_dos_locks.py` (versions in the Python locks less than 14 days old or yanked from PyPI); `pip-audit` on the API lock and on the executor lock (read directly, with `--disable-pip`); `npm audit --omit=dev` in `web/` and in `desktop/`. It does not block: each finding becomes a warning on the PR and the report goes to the run summary |

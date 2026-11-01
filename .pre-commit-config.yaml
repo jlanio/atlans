@@ -28,6 +28,11 @@
 # On Windows, prefix it with PYTHONUTF8=1: without it Python opens the
 # files in cp1252, chokes on those with accents and silently skips them —
 # the baseline comes out without them and CI (Linux, UTF-8) flags them as new hits.
+#
+# `commit-msg` is installed alongside `pre-commit`, for no-agent-attribution.
+# Every other hook declares its `stages`: without them, it would also run on
+# the commit message.
+default_install_hook_types: [pre-commit, commit-msg]
 
 repos:
   - repo: local
@@ -38,6 +43,7 @@ repos:
         entry: detect-secrets-hook
         language: system
         files: .*
+        stages: [pre-commit, pre-push, manual]
         args: ['--baseline', '.secrets.baseline']
         # Package manager locks: full of hashes that give false
         # positives. .secrets.baseline: self-reference. catalogo/: 22 MB of
@@ -72,6 +78,7 @@ repos:
         entry: check-yaml
         language: system
         types: [yaml]
+        stages: [pre-commit, pre-push, manual]
         # docker-compose uses !reset and other tags — check-yaml validates
         # standard syntax, so we skip compose files. Other YMLs, yes.
         exclude: docker-compose.*\.yml
@@ -89,9 +96,21 @@ repos:
         entry: check-merge-conflict
         language: system
         types: [text]
+        stages: [pre-commit, pre-push, manual]
       - id: mixed-line-ending
         name: mixed line ending
         entry: mixed-line-ending
         language: system
         types: [text]
+        stages: [pre-commit, pre-push, manual]
         args: ['--fix=lf']
+
+      # ── Owner's attribution rule (CONTRIBUTING, "6. Pre-commit hooks") ──
+      # Refuses a message with an AI agent's co-author trailer, a tool footer
+      # or a claude.ai/code link. CI's `attribution` job runs the same script
+      # on every commit of the PR.
+      - id: no-agent-attribution
+        name: no agent attribution in commit message
+        entry: python scripts/atribuicao_commits.py message
+        language: system
+        stages: [commit-msg]

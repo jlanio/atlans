@@ -92,12 +92,17 @@ def test_jobs_are_still_declared_with_the_usual_names():
     extensões (núcleo)" run the suites with the extensions deleted, as the free
     distribution runs them, in parallel jobs so as not to lengthen the ones above.
     Since then, "the six green".
+
+    "Atribuição (commits e PR)" runs on pull requests only (on push to main it
+    shows up as skipped): the owner's attribution rule, see
+    test_atribuicao_commits.py.
     """
     jobs = yaml.safe_load(CI.read_text())["jobs"]
     nomes = {j.get("name", chave) for chave, j in jobs.items()}
 
     assert nomes == {
         "Secrets scan (detect-secrets)",
+        "Atribuição (commits e PR)",
         "Backend (Python)",
         "Backend sem extensões (núcleo)",
         "Auditoria de dependências (informativa)",
