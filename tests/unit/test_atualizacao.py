@@ -100,7 +100,8 @@ _BACKUP_CA = "mkdir -p backups && : > backups/step-ca-$(date +%F-%H%M%S).tar.gz"
 _ENV = (
     'ATLANS_LANG=pt\n'
     'MINIO_ROOT_USER=atlans-x\n'
-    'DATABASE_URL="postgresql+asyncpg://atlans:s3cr3t-pw@db.interno:5432/atlans?ssl=require"\n'
+    # A made-up password: the test checks it never reaches a command line.
+    'DATABASE_URL="postgresql+asyncpg://atlans:s3cr3t-pw@db.interno:5432/atlans?ssl=require"\n'  # pragma: allowlist secret
 )
 _COMPOSE = "x-minio:\n  MINIO_ROOT_USER: ${MINIO_ROOT_USER:?defina}\n"
 _EXEMPLO = "ATLANS_LANG=\nMINIO_ROOT_USER=change-me\nDATABASE_URL=\n"
@@ -257,7 +258,7 @@ def test_update_backs_up_keeps_images_moves_code_and_records(inst):
     assert dump.read_bytes() == b"PGDMP-fake"
     assert _modo(dump) == 0o600
     assert "--network container:c-api" in chamadas
-    assert "env PGURL=postgresql://atlans:s3cr3t-pw@db.interno:5432/atlans\n" in chamadas
+    assert "env PGURL=postgresql://atlans:s3cr3t-pw@db.interno:5432/atlans\n" in chamadas  # pragma: allowlist secret
     assert all("s3cr3t-pw" not in linha for linha in chamadas.splitlines() if linha.startswith("docker "))
     assert "postgres:17-alpine" in chamadas
     assert not list((inst.dir / "backups").glob(".atlans-db-*"))
