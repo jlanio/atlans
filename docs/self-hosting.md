@@ -263,9 +263,9 @@ The executor talks to `AGENTS_HOST`. If it does not connect, start with
 - **Backup.** The CA volume (`make backup-stepca`, in a daily cron), the database
   (`pg_dump`) and the MinIO volume. Losing the CA invalidates every enrolled
   executor. See [operations.md](operations.md#backup-and-restore).
-- **Updating.** `git pull`, `docker compose --profile prod up -d --build` and
-  the migrations; before that, compare the new `.env.example` with your `.env`. See
-  [operations.md](operations.md#update-the-installation).
+- **Updating.** `make update`: backups of the CA and the database, the current
+  images kept as the way back, the new version brought up and checked; `make
+  rollback` undoes it. See [operations.md](operations.md#update-the-installation).
 - **Security.** Fixes arrive through the repository; applying them is up to each
   installation ([SECURITY.md](../SECURITY.md)).
 - **Modified the code?** The AGPL requires that whoever uses your installation over the network

@@ -1,6 +1,6 @@
 .PHONY: bootstrap bootstrap-stepca smoke seed-admin backup-stepca \
-        up-dev up-dev-no-executor up-prod down logs logs-dev logs-prod restart restart-prod \
-        build-dev build-prod check-db
+        up-dev up-dev-no-executor up-prod update rollback down logs logs-dev logs-prod \
+        restart restart-prod build-dev build-prod check-db
 
 # Dev comes with the local executor (profile executor-local): it enrolls and
 # connects on its own, so workflows run without creating one by hand. See
@@ -52,6 +52,20 @@ up-dev-no-executor:
 
 up-prod:
 	./scripts/up.sh prod $(ARGS)
+
+# Updates the installation that is running (dev or prod) to the new version:
+# backups of the CA and the database, the current images kept as the way back,
+# git, scripts/up.sh and the smoke test. ARGS="--check" only shows what would
+# change; ARGS="--to v2.21.0" goes to a tag instead of the branch's upstream.
+# See docs/operations.md, "Update the installation".
+update:
+	./scripts/update.sh $(ARGS)
+
+# Undoes the last `make update`: the code and the images back, without a build.
+# The database stays as it is (see docs/operations.md, "Undo an update").
+# ARGS="--list" lists the updates on record.
+rollback:
+	./scripts/rollback.sh $(ARGS)
 
 down:
 	docker compose $(TODOS_OS_PERFIS) down

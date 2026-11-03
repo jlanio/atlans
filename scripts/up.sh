@@ -10,12 +10,14 @@
 #   7. executor      (dev) waits for the local executor to connect
 #   8. ready         the addresses and the everyday commands
 #
-# Usage: ./scripts/up.sh dev|prod [--no-executor] [--yes] [--no-prompt]
+# Usage: ./scripts/up.sh dev|prod [--no-executor] [--yes] [--no-prompt] [--no-build]
 #        make up-dev | make up-dev-no-executor | make up-prod   (ARGS="--yes")
 #   --no-executor  dev without the local executor
 #   --yes          answers yes to the confirmations (prod migrations, CA phase 2)
 #   --no-prompt    asks nothing: what would need an answer is only reported.
 #                  Without a terminal it never asks either.
+#   --no-build     brings up the images already on this machine, building
+#                  none (scripts/rollback.sh: the images of the previous version)
 #
 # Running it again on a running install is a quick checkup: compose only
 # recreates what changed, and the migrations and the admin are idempotent.
@@ -49,11 +51,13 @@ esac
 EXECUTOR_LOCAL=1
 SIM=0
 PERGUNTAR=1
+CONSTRUIR=1
 for arg in "$@"; do
     case "$arg" in
         --no-executor) EXECUTOR_LOCAL=0 ;;
         --yes|-y) SIM=1 ;;
         --no-prompt) PERGUNTAR=0 ;;
+        --no-build) CONSTRUIR=0 ;;
         *) ui_err "$(t opt_unknown "$arg")"; exit 2 ;;
     esac
 done
@@ -162,13 +166,18 @@ fi
 # ── 2. Start ─────────────────────────────────────────────────────────────────
 ui_stage start
 # Any image of the mode still missing: the first build, which takes minutes.
-for imagem in $(dc config --images 2>/dev/null); do
-    if ! docker image inspect "$imagem" >/dev/null 2>&1; then
-        ui_info "$(t up_first_build)"
-        break
-    fi
-done
-if ! ui_run "$(t up_starting)" dc up -d --build; then
+if [ "$CONSTRUIR" = "1" ]; then
+    for imagem in $(dc config --images 2>/dev/null); do
+        if ! docker image inspect "$imagem" >/dev/null 2>&1; then
+            ui_info "$(t up_first_build)"
+            break
+        fi
+    done
+    CONSTRUCAO=--build
+else
+    CONSTRUCAO=--no-build
+fi
+if ! ui_run "$(t up_starting)" dc up -d "$CONSTRUCAO"; then
     case "$(cat "$UI_LOG")" in
         *"Pool overlaps"*) ui_hint "$(t up_hint_overlap)"; ui_cmd "make bootstrap" ;;
         *"port is already allocated"*|*"address already in use"*) ui_hint "$(t up_hint_port)" ;;
