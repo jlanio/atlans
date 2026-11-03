@@ -15,6 +15,7 @@
 
 import functools
 import io
+import logging
 import os
 import zipfile
 
@@ -23,6 +24,8 @@ _current_skip = {s for s in os.environ.get("GDAL_SKIP", "").split(",") if s}
 os.environ["GDAL_SKIP"] = ",".join(sorted(_current_skip | {"OGR_VRT", "VRT"}))
 
 import geopandas as gpd  # noqa: E402  (import apos configurar GDAL_SKIP)
+
+logger = logging.getLogger(__name__)
 
 
 class UnsafeGeoSourceError(ValueError):
@@ -107,9 +110,14 @@ def read_geodataframe(fonte, **kwargs):
 
     `fonte` may be a path (str/PathLike), bytes or a binary buffer
     (io.BytesIO), as `gpd.read_file` accepts.
+
+    In a shapefile, text that is not valid UTF-8 where the file says it is
+    does not stop the read: see `_reler_recuperando_texto`.
     """
+    dados = None
     if isinstance(fonte, (bytes, bytearray)):
-        _validate_bytes(bytes(fonte))
+        dados = bytes(fonte)
+        _validate_bytes(dados)
     elif isinstance(fonte, io.BytesIO):
         dados = fonte.getvalue()
         _validate_bytes(dados)
@@ -120,7 +128,92 @@ def read_geodataframe(fonte, **kwargs):
         fonte = io.BytesIO(dados)
     else:
         _validate_path(os.fspath(fonte))
-    return gpd.read_file(fonte, **kwargs)
+    try:
+        return gpd.read_file(fonte, **kwargs)
+    except UnicodeDecodeError as erro:
+        # The first read consumed the buffer: the next ones get it anew.
+        def de_novo():
+            return io.BytesIO(dados) if dados is not None else fonte
+        # Only a shapefile: its DBF is where the text gets cut (fixed-width
+        # fields) and where a .cpg can lie about the encoding. Any other
+        # format goes on failing as before — DataInput, for one, then reads a
+        # CSV inside a ZIP with its own reader, which knows decimal commas.
+        if "encoding" in kwargs or not _e_shapefile(de_novo(), kwargs.get("layer")):
+            raise
+        return _reler_recuperando_texto(de_novo(), kwargs, erro)
+
+
+def _e_shapefile(fonte, camada) -> bool:
+    try:
+        import pyogrio
+        return pyogrio.read_info(fonte, layer=camada)["driver"] == "ESRI Shapefile"
+    except Exception:
+        return False
+
+
+def _texto_utf8(valor: str) -> tuple[str, bool]:
+    """A value read as latin-1 (byte for byte) back to its text.
+
+    Returns the text and whether it needed repair. In order:
+    - valid UTF-8: as it is;
+    - UTF-8 with the last character cut in half: a shapefile's DBF stores
+      text in fields of up to 254 BYTES, and the program that wrote it cut a
+      2-byte "ã"/"ç" at the border (ICMBio's autos_infracao_icmbio_shp.zip:
+      0xc3 at position 253). The half character goes, the rest stays;
+    - UTF-8 with a broken byte inside: only that byte becomes U+FFFD;
+    - not UTF-8 at all (a .cpg that says UTF-8 over a Windows file): cp1252,
+      the encoding of Brazilian files from that world.
+    """
+    bruto = valor.encode("latin-1")
+    try:
+        return bruto.decode("utf-8"), False
+    except UnicodeDecodeError as erro:
+        if erro.reason == "unexpected end of data":
+            return bruto[:erro.start].decode("utf-8", errors="replace"), True
+    texto = bruto.decode("utf-8", errors="replace")
+    if any(ord(c) > 0x7F and c != "\ufffd" for c in texto):
+        return texto, True
+    return bruto.decode("cp1252", errors="replace"), True
+
+
+def _reler_recuperando_texto(fonte, kwargs: dict, erro: UnicodeDecodeError):
+    """Reads again with the text as raw bytes, and repairs each value.
+
+    pyogrio decodes the whole layer in the encoding the file declares (the
+    .cpg of a shapefile) and gives up on the first invalid value: one cut
+    character in one record made the file unreadable. Asked for latin-1,
+    pyogrio reads the bytes as they are (GDAL recodes nothing), one character
+    per byte — nothing is lost, and `_texto_utf8` turns each value back into
+    its text. The field names go through the same.
+    """
+    try:
+        # "ISO-8859-1", not "latin-1": GDAL does not know the Python alias,
+        # recodes nothing with it, and the same error comes back.
+        gdf = gpd.read_file(fonte, encoding="ISO-8859-1", **kwargs)
+    except Exception:
+        raise erro from None
+    consertados = 0
+
+    def consertar(valor):
+        nonlocal consertados
+        if not isinstance(valor, str):
+            return valor
+        texto, consertado = _texto_utf8(valor)
+        consertados += consertado
+        return texto
+
+    geometria = getattr(gdf, "_geometry_column_name", None)
+    for coluna in gdf.columns:
+        if coluna != geometria and (gdf[coluna].dtype == object or str(gdf[coluna].dtype) in ("string", "str")):
+            gdf[coluna] = gdf[coluna].map(consertar)
+    gdf = gdf.rename(columns=lambda nome: consertar(nome) if nome != geometria else nome)
+    logger.warning(
+        "Leitura do shapefile: ele diz estar em UTF-8, mas %d texto(s) não estavam "
+        "(%s). Recuperados: um caractere cortado no fim do campo (o limite de 254 bytes "
+        "do shapefile) sai; um texto em outra codificação é lido como cp1252.",
+        consertados, erro.reason,
+    )
+    return gdf
 
 
 def list_layers(fonte) -> list[str]:
