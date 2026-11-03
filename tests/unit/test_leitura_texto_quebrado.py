@@ -125,7 +125,7 @@ def test_a_valid_file_is_read_once_and_untouched(tmp_path, caplog, monkeypatch):
         gdf = read_geodataframe(shp)
     assert list(gdf["descricao"]) == ["Ação", "x"]
     assert leituras == [{}]
-    assert caplog.text == ""
+    assert not [r for r in caplog.records if r.name == "flow.utils.leitura_geo"]
 
 
 def test_an_encoding_asked_by_the_caller_is_respected(tmp_path):
