@@ -74,6 +74,8 @@ Then open **http://localhost:3000** and sign in. 🎉
 | `make up-dev-no-executor` | Starts it without the local executor |
 | `make check-db` | Checks the database connection, the extensions and the schema (production: `make check-db SERVICE=api-prod`) |
 | `make up-prod` | The same for production: asks before migrating a database that already has a schema and issues the executors' certificates on the first run |
+| `make update` | Updates a running installation to the new version: backs up the CA and the database, keeps the current images, shows what changes and brings it up (`ARGS="--check"` only shows) |
+| `make rollback` | Undoes the last `make update`: the code and the images back, without a build |
 | `make down` | Stops everything (the data stays) |
 
 Going to a real server, with HTTPS and your own domain? Follow the step-by-step guide in [docs/self-hosting.md](docs/self-hosting.md).

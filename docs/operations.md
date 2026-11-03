@@ -10,6 +10,7 @@ In the examples, `<PUBLIC_HOST>`, `<AGENTS_HOST>` and `<S3_HOST>` are the hosts 
 ## Contents
 
 - [Update the installation](#update-the-installation)
+- [Undo an update](#undo-an-update)
 - [Roll back a version](#roll-back-a-version)
 - [Backup and restore](#backup-and-restore)
 - [Admin seed](#admin-seed)
@@ -27,6 +28,52 @@ In the examples, `<PUBLIC_HOST>`, `<AGENTS_HOST>` and `<S3_HOST>` are the hosts 
 - [Troubleshooting](#troubleshooting)
 
 ## Update the installation
+
+On the host, in the installation's folder:
+
+```bash
+make update                       # to the newest commit of the branch (main)
+make update ARGS="--check"        # only shows what would change; changes nothing
+make update ARGS="--to v2.21.0"   # to a tag (or a commit) instead
+```
+
+[scripts/update.sh](../scripts/update.sh) finds the mode that is running
+(`api-prod` is production, `api` is dev) and goes in stages, stopping at the first
+one that fails:
+
+1. **Checks.** Docker answers; the repository's files have no local changes (files
+   outside git, such as a local certificate or an extra file in
+   `traefik-dynamic/`, are fine); room on the disk for the build.
+2. **What changes.** `git fetch`, then the commits the new version brings, whether it
+   has new migrations, and the variables of the new `.env.example` that your `.env`
+   lacks. A variable the new `docker-compose.yml` requires (`${VAR:?...}`) and your
+   `.env` lacks stops the update here, before anything is touched.
+3. **Backups and way back.** `make backup-stepca`; a `pg_dump` of the database in
+   `backups/atlans-db-<date>.dump` (0600; the newest 10 are kept); and the image of
+   every running container tagged `atlans-rollback/<name>:<commit>`. The `pg_dump`
+   runs in the official `postgres` image of the server's own major version, in a
+   container that joins the API's network namespace: it reaches the database the way
+   the API does, whatever `DATABASE_URL` points at, and needs no PostgreSQL client on
+   the host. A database backed up elsewhere: `ARGS="--skip-db-backup"`.
+4. **Code.** A fast-forward to the new version (with `--to`, a checkout of it).
+5. **Containers.** `scripts/up.sh`: the build, the recreation of what changed and
+   the migrations (in production it asks before migrating, as `make up-prod` does).
+6. **Verification.** `make smoke` and, in production, Traefik's log: a router that
+   names a middleware the new `dynamic.yml` lacks is dropped without a sound on HTTP.
+
+Each update leaves a record in `backups/atualizacoes/` (where it came from, where it
+went, the backups, the images kept), which `make rollback` reads. The images kept
+by the two newest updates stay; older ones are released (`ATLANS_ROLLBACK_KEEP`).
+Run again with the code already updated and running, it says so and does nothing;
+with the code updated but not running (a `git pull` without the rebuild), it brings
+it up. When an update fails after the code moved (the build, a migration, the smoke
+test), fix the cause and run `make update` again: it picks up where it stopped, with
+the backups and images taken before it — or undo it with `make rollback`.
+
+Without a terminal (cron, a pipeline) it asks nothing: `ARGS="--yes"` answers yes to
+the update and to the migrations; without it, it stops before changing anything.
+
+### By hand
 
 With the new version's code on the host (`git pull`, or `git checkout` of the tag):
 
@@ -62,9 +109,46 @@ On the first start (empty database), the same command creates the whole schema: 
 base revision runs [scripts/init_schema.sql](../scripts/init_schema.sql) and
 the `schema.sql` of each installed extension (`app/extensoes/`).
 
+## Undo an update
+
+```bash
+make rollback                    # undoes the last make update
+make rollback ARGS="--list"      # the updates on record
+make rollback ARGS="2026-11-03-140602"   # one of them, by name
+```
+
+[scripts/rollback.sh](../scripts/rollback.sh) takes the code back to the commit before
+the update (on the same branch: `git reset --keep`, which refuses to overwrite a local
+change), puts the images the update kept back under their names and brings the
+containers up **without a build** (`scripts/up.sh --no-build`), then runs the smoke
+test. If a kept image is gone (`docker image prune -a`, say), it builds the previous
+version from its code instead. Once undone, `make update` goes forward again.
+
+### The database does not go back
+
+The update's migrations stay in the database. When there were any, the script says
+so before going on, as the old code does not know the new schema (its `alembic
+upgrade head` fails with "Can't locate revision"). The two ways out, before running
+`make rollback`:
+
+- **Undo the migrations**, with the new code still in place (what they stored is
+  lost): `docker compose --profile prod exec api-prod alembic downgrade -<N>`, N being
+  the number of migrations the update brought (the script shows the command).
+- **Restore the dump** the update took: it brings the database back to the moment
+  before the update, and loses what was written since. With the major version of
+  your server in the image tag (the update shows it):
+
+```bash
+U=$(grep -E '^DATABASE_URL=' .env | cut -d= -f2- | tr -d '"' | sed -e 's/+asyncpg//' -e 's/?.*//')
+API=$(docker compose --profile prod ps -q api-prod)
+U="$U" docker run --rm -i --network "container:$API" -e U postgres:17-alpine \
+    sh -c 'pg_restore --clean --if-exists --no-owner --no-privileges -d "$U"' \
+    < backups/atlans-db-AAAA-MM-DD-HHMM.dump
+```
+
 ## Roll back a version
 
-Take the code back to the good version (`git checkout` of the previous tag) and bring it up as in
+By hand, or to a version that `make update` did not bring: take the code back to the good version (`git checkout` of the previous tag) and bring it up as in
 [Update the installation](#update-the-installation). With images from a registry,
 keep one tag per version and point `ATLANS_API_IMAGE` and `ATLANS_WEB_IMAGE`
 at the previous one.
