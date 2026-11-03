@@ -263,15 +263,45 @@ The executor talks to `AGENTS_HOST`. If it does not connect, start with
 - **Backup.** The CA volume (`make backup-stepca`, in a daily cron), the database
   (`pg_dump`) and the MinIO volume. Losing the CA invalidates every enrolled
   executor. See [operations.md](operations.md#backup-and-restore).
-- **Updating.** `make update`: backups of the CA and the database, the current
-  images kept as the way back, the new version brought up and checked; `make
-  rollback` undoes it. See [operations.md](operations.md#update-the-installation).
+- **Updating.** `make update`, and `make rollback` to undo it: see
+  [6. Updating](#6-updating).
 - **Security.** Fixes arrive through the repository; applying them is up to each
   installation ([SECURITY.md](../SECURITY.md)).
 - **Modified the code?** The AGPL requires that whoever uses your installation over the network
   can obtain the source code of the version running on it (section 13 of the
   [LICENSE](../LICENSE)): publish your fork and point `CODIGO_FONTE_URL`, in the
   `.env`, to it. The link appears on the sign-in screen and in the account menu.
+
+## 6. Updating
+
+In the installation's folder, on the server:
+
+```bash
+make update ARGS="--check"   # what the new version brings; changes nothing
+make update                  # backups, the new version brought up and checked
+make rollback                # something wrong: back to the previous version
+```
+
+`make update` stops before touching anything when the new version requires a
+`.env` variable yours lacks, and leaves the way back ready before it changes
+the code: the CA and database backups in `backups/` and the current images.
+`make rollback` brings back the code and those images, with no build — but not
+the database: when an update brings migrations, read
+[operations.md, "Undo an update"](operations.md#undo-an-update) before undoing
+it. All the details: [operations.md, "Update the installation"](operations.md#update-the-installation).
+
+**The executors are updated on their own machines**: `make update` touches the
+server only, and the workflows' nodes run on the executor. One installed with
+`install.sh` (Docker), in the folder of the install (`~/atlans-executor` by
+default, or its `--dir`):
+
+```bash
+git pull --ff-only
+docker compose -f docker-compose.executor.yml up -d --build
+```
+
+The `executor-data` volume keeps the enrollment: the executor reconnects with no
+new code. The Windows desktop app updates itself.
 
 ## What the installation does not include
 

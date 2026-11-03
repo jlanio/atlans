@@ -73,6 +73,19 @@ the backups and images taken before it — or undo it with `make rollback`.
 Without a terminal (cron, a pipeline) it asks nothing: `ARGS="--yes"` answers yes to
 the update and to the migrations; without it, it stops before changing anything.
 
+**Executors.** `make update` updates the server only. The nodes of a workflow run on
+the executor, so a fix in a node (DataInput, say) reaches a run only once the
+executor has it too. An executor installed with `install.sh` (Docker), in its
+folder (`~/atlans-executor` by default):
+
+```bash
+git pull --ff-only
+docker compose -f docker-compose.executor.yml up -d --build
+```
+
+The `executor-data` volume keeps the enrollment. The Windows desktop app updates
+itself (`electron-updater`).
+
 ### By hand
 
 With the new version's code on the host (`git pull`, or `git checkout` of the tag):

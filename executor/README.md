@@ -466,6 +466,22 @@ docker compose -f docker-compose.executor.yml logs -f
 docker compose -f docker-compose.executor.yml down
 ```
 
+### Update
+
+The server's `make update` does not reach the executors: each one is updated on
+its own machine, in the folder of the install (`~/atlans-executor` with
+`install.sh`'s default):
+
+```bash
+git pull --ff-only
+docker compose -f docker-compose.executor.yml up -d --build
+```
+
+The new image replaces the container; the `executor-data` volume (certs and
+keys) stays, so the enrollment remains valid and the executor reconnects on
+its own. A job running at that moment drains first (see the compose file's
+`stop_grace_period`).
+
 Two processes with the same outbox (on the desktop, an app killed by force leaves the
 old Python draining for up to 150 s while the reopened app starts another): the
 journal has an owner. The process locks `.executor_results.sqlite.dono` at startup; if another
