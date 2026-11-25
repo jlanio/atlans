@@ -1,6 +1,6 @@
 # Spec — Node data panels (Entradas / Saídas)
 
-Status: proposed · Date: 2026-11-25
+Status: approved, not implemented · Date: 2026-11-25
 Scope: `flow/executor/` (sample builder), `executor/` (envelope), `app/` (execute payload),
 `web/app/components/workflow/node-config-modal/` and `web/app/stores/` (panels)
 Mockup: the interactive preview reviewed in the project thread (three columns, Schema / Tabela / JSON).
@@ -54,7 +54,8 @@ Non-goal (this round):
 | It travels in a **separate node event** (`status: "sample"`), not inside `completed` | Its own 64 KB budget; a large sample can never push the traceback or `output_columns` out of the lifecycle event through the reduction (`flow/utils/publisher/reducao.py`) |
 | Off unless the request asks for it: new `data_preview` flag, sent only by the editor's Run button | Real data leaves the executor only when a person is looking at it; scheduled and webhook runs are unchanged |
 | 20 rows, ≤ 40 columns, cells cut at 120 chars, geometry summarized | Enough to read values; keeps one node under ~16 KB in the common case |
-| Not persisted in the database (`node_stats` is untouched) | Same retention as the rest of the run events: the 1 h Redis history (`REDIS_TTL_1H`). Avoids storing user data in Postgres |
+| Not persisted in the database (`node_stats` is untouched) | Same retention as the rest of the run events: the 1 h Redis history (`REDIS_TTL_1H`), confirmed as enough. Avoids storing user data in Postgres |
+| An admin can turn samples off for the whole installation (on by default) | Some installations handle data that must not leave the executor, even as a sample |
 | Live secrets redacted in every string cell before sending | Same guarantee the logs already have (`flow/utils/segredos_vivos.py`) |
 | One shared `DataView` component for both panels | Same behavior on both sides, one place to test |
 
@@ -67,6 +68,10 @@ Non-goal (this round):
 ```python
 data_preview: bool = Field(default=False, description="Send a data sample of each node's outputs (editor only)")
 ```
+
+The server computes the effective value as
+`payload.data_preview and node_data_preview_enabled` (§4.3) and returns it in the execute
+response as `data_preview: bool`, so the editor knows whether to wait for samples.
 
 The description of `debug_mode` is fixed at the same time: it says the executor "pauses at
 each node", which it does not.
@@ -83,7 +88,22 @@ server reads `payload.get("data_preview", False)` and stays off.
 `job_validator.py` like `debug_mode`) and passes it to `WorkflowExecutor(data_preview=…)`.
 Nested executors (`flow/nodes/control/sub_workflow.py`) receive `data_preview=False`.
 
-### 4.3 The sample event
+### 4.3 Admin setting
+
+A `SystemConfig` row, key `node_data_preview_enabled`, value `"true"`/`"false"`; a missing
+row means on. Same pattern as `artifact_retention_days` (`artifacts_router.py`, `/admin/settings`).
+
+- `GET /workflows/admin/data-preview` and `PUT /workflows/admin/data-preview`
+  (`require_admin`), body `{"enabled": bool}`, in `admin_workflows_router.py`.
+- Read once per execute request in `workflow_execution_service` (one indexed lookup); no cache,
+  so turning it off takes effect on the next run.
+- Admin UI: a "Amostras de dados no editor" section with one switch in
+  `web/app/components/admin/settings/` (new `amostras-de-dados.tsx`, listed in `nav.tsx`),
+  with the text: "Quando ligado, execuções feitas pelo editor enviam as primeiras linhas de
+  cada nó para os painéis Entradas e Saídas. Os dados ficam 1 hora no histórico da execução."
+- Turning it off does not erase samples already in the 1 h history; it only stops new ones.
+
+### 4.4 The sample event
 
 Published by `flow/executor/events.py::publish_sample` right after `publish_completed`,
 only when `data_preview` is on, the node completed (or was served from a pin) and the
@@ -189,8 +209,8 @@ In `_run_node_with_tracking`:
 - `RawEvent.extra.output_sample?: OutputSample` in `workflowExecutionStore.ts`, with
   `OutputSample` / `OutputSampleEntry` types in `web/types/`.
 - New store slice `samples: Record<nodeId, { sample: OutputSample; runId: string; stale: boolean }>`.
-- `useExecuteWorkflow.ts` sends `data_preview: true` (via `GisFlowService.executeWorkflow`)
-  and routes `status === "sample"` events into the slice instead of the canvas status.
+- `useExecuteWorkflow.ts` sends `data_preview: true` (via `GisFlowService.executeWorkflow`),
+  stores the effective `data_preview` from the response, and routes `status === "sample"` events into the slice instead of the canvas status.
 - When a run starts, existing samples are marked `stale: true` (shown greyed with
   "da execução anterior"); each one is replaced when its node's new sample arrives.
 - `loadHistoricalEvents` handles `sample` events too, so reopening the editor within the
@@ -208,7 +228,7 @@ In `_run_node_with_tracking`:
 | `JsonView` | Highlighted JSON; tables shown as their first 3 rows as objects |
 | `SourcePicker` | Input panel only: "Ligados a este nó" (direct parents, with the port each one feeds) then "Outros nós anteriores" (every ancestor, via `graph-traversal.ts`) |
 | `KeyTabs` | One button per output key when the node has more than one (`output`, `metadata`, `removed`…) |
-| `DataEmptyState` | "Ainda sem dados de execução", Run button, and the declared schema below |
+| `DataEmptyState` | "Ainda sem dados de execução", Run button, and the declared schema below. When the last run came back with `data_preview: false`: "Amostras de dados desligadas pelo administrador", no Run button |
 
 Drag payloads keep the current rules of `input-inspector.tsx`:
 key → `{{ Alias.key }}`; column → column name; JSON leaf → `{{ Alias.key.path }}`;
@@ -241,7 +261,7 @@ keeps its current width; on screens below `lg` nothing changes.
   with live secrets redacted, and lives 1 h in Redis.
 - The server does not trust the executor's size: `_serialize_node_event` keeps applying
   the byte ceiling to `sample` events like any other.
-- Open: an admin setting to turn samples off for the whole installation (§10).
+- An admin can turn samples off for the whole installation (§4.3).
 
 ## 8. Tests
 
@@ -253,8 +273,9 @@ Python (`tests/unit/`):
 - `test_core_amostra.py`: sample event emitted only with `data_preview`, for completed and
   pinned nodes, never for failed or nested ones; spilled outputs still sampled from the real
   payload.
-- Server: `ExecutePayload.data_preview` reaches the envelope; a `sample` event above the
-  ceiling is reduced by `_serialize_node_event`.
+- Server: `ExecutePayload.data_preview` reaches the envelope; with the setting off the
+  envelope carries `false` and the response says so; the admin routes require admin and
+  validate the body; a `sample` event above the ceiling is reduced by `_serialize_node_event`.
 
 Web (`web/__tests__/`, vitest):
 - Store: `sample` events go to the slice, are marked stale on a new run, are restored by
@@ -267,9 +288,10 @@ Web (`web/__tests__/`, vitest):
 ## 9. Delivery
 
 1. **PR 1 — backend**: `sample.py`, `redact_text`, `data_preview` through API → envelope →
-   executor → `core.py`, `HEAVY_EXTRA_KEYS`, `debug_mode` description, Python tests.
+   executor → `core.py`, the admin setting and its routes, `HEAVY_EXTRA_KEYS`,
+   `debug_mode` description, Python tests.
    Mergeable alone: with no client sending `data_preview`, nothing changes.
-2. **PR 2 — web**: store, `data-view/`, both panels, resizable layout, vitest.
+2. **PR 2 — web**: store, `data-view/`, both panels, resizable layout, the admin switch, vitest.
 
 Follow-ups, out of this round:
 - Mini map of the sample geometries in the Tabela view.
@@ -278,10 +300,9 @@ Follow-ups, out of this round:
 - Debug mode: publish the failing node's inputs summary on failure, or retire the toggle
   now that samples cover its use.
 
-## 10. Open questions
+## 10. Decided
 
-1. Should an admin be able to turn samples off for the installation (setting in
-   `admin/settings`)? Proposed default: on.
-2. Is 1 h of retention (Redis history) enough, or should the editor keep the last sample per
-   node in memory across runs of the same session only (current proposal), or persist it?
-3. Should the MCP `run_workflow` tool also request samples, so an assistant can inspect data?
+- Admin switch to turn samples off: yes, on by default (§4.3).
+- Retention: the 1 h of the run event history is enough; nothing is persisted.
+- MCP `run_workflow` does not request samples in this round; it can be added later by
+  sending `data_preview` from the tool, under the same admin switch.
