@@ -7,14 +7,18 @@ import type {
 
 // ── Workflows ──────────────────────────────────────────────────────────────
 
-export function executeWorkflow(id: string, inputs: Record<string, unknown> = {}, debugMode = false) {
+export function executeWorkflow(id: string, inputs: Record<string, unknown> = {}, debugMode = false, dataPreview = false) {
   // Uses the authenticated endpoint (/workflows/{id}/execute) instead of
   // /webhook/execute — the canvas is a JWT-authenticated user session (manual
   // intent), not an external caller. The /webhook/execute endpoint requires a
   // WebhookTrigger in the workflow and blocks any other trigger type.
-  return post<{ task_id: string; workflow: string }>(`/workflows/${id}/execute`, {
+  // `data_preview`: asks the executor for a sample of each node's outputs for
+  // the Entradas/Saídas panels. The response says whether it will happen — the
+  // admin can turn samples off (docs/specs/node-data-panels.md §4.3).
+  return post<{ task_id: string; workflow: string; data_preview?: boolean }>(`/workflows/${id}/execute`, {
     inputs,
     debug_mode: debugMode,
+    data_preview: dataPreview,
   })
 }
 

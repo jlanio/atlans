@@ -10,6 +10,7 @@ import { GisFlowService } from "@/service/GisFlowService"
 import { getWsUrl } from "@/utils/env"
 import { useWorkflowExecutionStore, toRunEvent, eventKind, RawEvent, MAX_RUN_EVENTS, RUN_TERMINAL } from "@/app/stores/workflowExecutionStore"
 import { useKnownColumnsStore } from "@/app/stores/knownColumnsStore"
+import { useNodeSamplesStore, amostraDoEvento, amostrasDosEventos } from "@/app/stores/nodeSamplesStore"
 
 /** Synthetic id the backend uses to signal the end of the run. */
 const WF_COMPLETE = "__workflow_complete__"
@@ -453,6 +454,10 @@ export const useExecuteWorkflow = () => {
       return
     }
 
+    // The previous samples stay visible, marked as stale, until this run
+    // replaces them node by node. `data_preview: false` back = admin switch off.
+    useNodeSamplesStore.getState().beginRun(id, taskId, respExec?.data?.data_preview === true)
+
     // If this instance is not the socket owner (the trigger came from the webhook's
     // "Testar" tab, for example), it hands the run to whoever governs — instead
     // of opening a second socket over the same store.
@@ -572,9 +577,16 @@ export const useExecuteWorkflow = () => {
       // because keeping the old value would assert columns this run did not produce.
       const batchColumns = new Map<string, Record<string, string[]> | null>()
       let fim: RawEvent | null = null
+      const amostras = useNodeSamplesStore.getState()
       for (const data of lote) {
         if (data.node === WF_COMPLETE) {
           fim = data
+          continue
+        }
+        // Data sample for the node modal's panels: never touches the canvas.
+        if (data.status === "sample") {
+          const sample = amostraDoEvento(data)
+          if (sample && data.node) amostras.apply(id, taskId, data.node, sample)
           continue
         }
         if (eventKind(data) !== "lifecycle") continue
@@ -833,7 +845,8 @@ export const useExecuteWorkflow = () => {
     // isExecuting=true. A guard here (which existed before the Zustand refactor)
     // blocks the POST and leaves respExec=undefined → task_id "undefined" in the
     // WebSocket URL → 4404. That was the real bug observed on the canvas.
-    const data = await GisFlowService.executeWorkflow(id, inputs, debugMode)
+    // The editor always asks for samples; the server decides (admin switch).
+    const data = await GisFlowService.executeWorkflow(id, inputs, debugMode, true)
     return data
   }
 
@@ -914,6 +927,19 @@ export const useExecuteWorkflow = () => {
         }
         if (Object.keys(columnsByNode).length > 0) {
           useKnownColumnsStore.getState().semearDoHistorico(id, latest.run_id, columnsByNode)
+        }
+        // The data samples of that run, while its history lives (1 h in Redis).
+        // Best-effort like the columns: an expired or forbidden history leaves
+        // the panels on their empty state.
+        try {
+          const eventos = await GisFlowService.getRunEvents(latest.run_id)
+          if (aborted()) return
+          const amostras = amostrasDosEventos(eventos?.data?.events ?? [])
+          if (Object.keys(amostras).length > 0) {
+            useNodeSamplesStore.getState().seedFromHistory(id, latest.run_id, amostras)
+          }
+        } catch {
+          // a hint, not state
         }
         return
       }

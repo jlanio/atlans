@@ -82,6 +82,16 @@ export function updateArtifactSettings(retentionDays: number | null) {
   return put<IArtifactSettings>("/artifacts/admin/settings", { artifact_retention_days: retentionDays })
 }
 
+// ── Data samples in the editor (admin) ─────────────────────────────────────
+
+/** Whether runs started from the editor send a data sample of each node to the
+ *  Entradas/Saídas panels (docs/specs/node-data-panels.md §4.3). */
+export function getDataPreviewSetting() { return get<{ enabled: boolean }>("/admin/workflows/data-preview") }
+
+export function setDataPreviewSetting(enabled: boolean) {
+  return put<{ enabled: boolean }>("/admin/workflows/data-preview", { enabled })
+}
+
 // ── Admin: User Management ─────────────────────────────────────────────────
 
 export function getAdminUsers(params: import("../types").IAdminUserListParams = {}) {

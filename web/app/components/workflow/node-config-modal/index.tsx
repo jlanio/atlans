@@ -29,14 +29,25 @@ import { NODE_ICONS } from "@/consts/WorkflowIcons"
 import { TYPE_STYLES, DEFAULT_STYLE } from "@/consts/NodeTypeStyles"
 import { RESERVED_ALIASES, isValidAlias } from "../utils/node-alias"
 import { mudancaDeSaidas, trocasDaChaveRenomeada } from "../utils/variaveis-de-saida"
+import { useResizablePanel } from "@/app/hooks/useResizablePanel"
 
 // Classes shared by the side panels (Input / Output) and the central modal.
 // Centralizing them avoids visual drift among the 3 panels when adjusting width/shadow.
-// The Input/Output panels add up to 480px with the modal in the middle — they
-// don't fit on a phone alongside anything. They are hidden below `lg`, where the
-// set would start squeezing each other; the central modal still gives access to
-// the configuration, and the input/output data is still in the run panel.
-const SIDE_PANEL = "hidden lg:flex w-[240px] shrink-0 flex-col overflow-y-auto bg-card border border-border/60 shadow-lg pointer-events-auto h-[68vh] z-[1]"
+// The side panels don't fit on a phone alongside anything. They are hidden below
+// `lg`, where the set would start squeezing each other; the central modal still
+// gives access to the configuration, and the input/output data is still in the
+// run panel.
+//
+// Width: they used to be 240px, too narrow for the data table
+// (docs/specs/node-data-panels.md §6.4). Now 360px by default, resizable by the
+// outer edge, remembered per browser. The ceiling keeps the three panels on screen.
+const SIDE_PANEL = "relative hidden lg:flex shrink-0 flex-col overflow-hidden bg-card border border-border/60 shadow-lg pointer-events-auto h-[68vh] z-[1]"
+const SIDE_PANEL_SIZE = { defaultWidth: 360, minWidth: 280, maxWidth: 560 } as const
+// Whatever width is saved, the three panels share the screen: each side panel
+// gets at most half of what the central modal (600px, or 60vw) leaves.
+const SIDE_PANEL_MAX = "calc((100vw - min(600px, 60vw)) / 2 - 12px)"
+const RESIZE_HANDLE = "group/alca absolute inset-y-0 z-10 w-2 cursor-col-resize touch-none focus-visible:outline-none"
+const RESIZE_LINE = "absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover/alca:bg-primary group-focus-visible/alca:bg-primary"
 // `max-w-[60vw]` alone gave 216px on a 360px phone — narrower than the node
 // card itself. On a phone the modal takes the screen, minus a margin.
 const MODAL_BOX  = "relative pointer-events-auto bg-background rounded-lg border border-border shadow-lg flex flex-col w-full max-w-[calc(100vw-1.5rem)] h-[88vh] lg:w-[600px] lg:max-w-[60vw] lg:h-[80vh] z-[2]"
@@ -53,6 +64,10 @@ const NodeConfigModal = () => {
   const { setNodes, getNode } = useReactFlow<INodeContext, Edge>()
   const store = useStoreApi<INodeContext, Edge>()
   const { configNodeIdParam, removeConfigNodeParam } = useConfigNodeParams()
+  // The input panel grows to the left (handle on its left edge) and the output
+  // panel to the right — hence the opposite `side` of each.
+  const entrada = useResizablePanel({ storageKey: "atlans:painel-no:entradas:largura", side: "right", ...SIDE_PANEL_SIZE, enabled: !!configNodeIdParam })
+  const saida = useResizablePanel({ storageKey: "atlans:painel-no:saidas:largura", side: "left", ...SIDE_PANEL_SIZE, enabled: !!configNodeIdParam })
   // The modal is a portal WITHOUT a blocking overlay: the canvas stays draggable
   // while it is open. Subscribing to `useNodes()` made the reconciliation below
   // (and the whole form) run on every pointermove. These two subscriptions only
@@ -223,9 +238,12 @@ const NodeConfigModal = () => {
       <div className="relative z-10 flex items-center pointer-events-none w-full justify-center px-3 px-safe lg:w-auto lg:px-0">
 
         {/* Left panel — Input (behind the modal, smaller) */}
-        <div className={`${SIDE_PANEL} rounded-l-lg -mr-2`}>
+        <div className={`${SIDE_PANEL} rounded-l-lg -mr-2`} style={{ width: entrada.width, maxWidth: SIDE_PANEL_MAX }}>
+          <div {...entrada.resizeHandleProps} className={`${RESIZE_HANDLE} -left-1`}>
+            <span className={RESIZE_LINE} />
+          </div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 px-4 pt-3 pb-1 shrink-0">
-            Entrada
+            Entradas
           </p>
           <InputInspector nodeFound={nodeFound} />
         </div>
@@ -440,9 +458,12 @@ const NodeConfigModal = () => {
         </div>{/* fim modal central */}
 
         {/* Right panel — Output (behind the modal, smaller) */}
-        <div className={`${SIDE_PANEL} rounded-r-lg -ml-2`}>
+        <div className={`${SIDE_PANEL} rounded-r-lg -ml-2`} style={{ width: saida.width, maxWidth: SIDE_PANEL_MAX }}>
+          <div {...saida.resizeHandleProps} className={`${RESIZE_HANDLE} -right-1`}>
+            <span className={RESIZE_LINE} />
+          </div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 px-4 pt-3 pb-1 shrink-0">
-            Saída
+            Saídas
           </p>
           <OutputPreview nodeFound={nodeFound} />
         </div>

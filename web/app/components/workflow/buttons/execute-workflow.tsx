@@ -139,8 +139,8 @@ const ExecuteWorkflow = () => {
           <TooltipContent side="right">
             <p className="text-xs max-w-[200px]">
               {debugMode
-                ? "Debug ativo — cada nó pausa e exibe dados intermediários antes de continuar"
-                : "Ativar debug — pausa em cada nó para inspecionar dados"}
+                ? "Debug ativo — o log da execução mostra um resumo das entradas e saídas de cada nó"
+                : "Ativar debug — resumo das entradas e saídas de cada nó no log da execução"}
             </p>
           </TooltipContent>
         </Tooltip>
