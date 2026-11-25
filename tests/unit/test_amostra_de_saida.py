@@ -118,7 +118,7 @@ def test_saida_que_nao_e_dict_vira_output():
 def test_segredo_em_uso_e_colunas_sensiveis_saem_mascarados():
     df = pd.DataFrame({"url": ["https://wfs?authkey=abcdef123456"], "api_key": ["k-999999"],
                        "Senha": ["segredo1"], "nome": ["ok"]})
-    with in_use("abcdef123456"):
+    with in_use("abcdef123456"):  # pragma: allowlist secret
         sample = build_output_sample({
             "output": df,
             "cfg": {"token": "t-123456789", "host": "db.local", "nota": "chave abcdef123456"},
