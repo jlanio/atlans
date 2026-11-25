@@ -27,6 +27,7 @@ from app.api.dependencies import get_db, require_admin
 from app.core.scheduling.hooks import sync_schedules_with_workflow_state
 from app.core.utils.logger import get_logger
 from app.crud.workflow_crud import WorkflowCRUD
+from app.services.amostras_de_dados import amostras_habilitadas, definir_amostras
 
 logger = get_logger(__name__)
 
@@ -39,6 +40,37 @@ router = APIRouter(
 
 class SetWorkflowStatusBody(BaseModel):
     flag_ative: bool
+
+
+class DataPreviewBody(BaseModel):
+    enabled: bool
+
+
+# Declared before `/{id_hash}/status`; the paths do not overlap (one segment vs
+# two), the order is only for whoever reads.
+@router.get(
+    "/data-preview",
+    summary="[Admin] Se as execuções do editor enviam amostras de dados dos nós",
+)
+async def get_data_preview(db: AsyncSession = Depends(get_db)):
+    return {"enabled": await amostras_habilitadas(db)}
+
+
+@router.put(
+    "/data-preview",
+    summary="[Admin] Liga ou desliga as amostras de dados no editor",
+)
+async def set_data_preview(
+    payload: DataPreviewBody,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_admin),
+):
+    enabled = await definir_amostras(db, payload.enabled)
+    logger.info(
+        "[admin] amostras de dados no editor %s por %s",
+        "ligadas" if enabled else "desligadas", getattr(current_user, "id_hash", "?"),
+    )
+    return {"enabled": enabled}
 
 
 @router.put(

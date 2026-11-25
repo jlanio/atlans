@@ -216,6 +216,8 @@ async def test_envelope_and_encryption_arguments(cenario):
         "params": {},
         "workspace_id": None,
         "debug_mode": False,
+        # Off unless the editor asked and the admin allows (docs/specs/node-data-panels.md).
+        "data_preview": False,
         "pinned_outputs": {"n1": {"__pin_s3_key__": "k1"}},
         "pin_metadata": {"n1": {"expires_at": None}},
         "disabled_nodes": ["Velho"],

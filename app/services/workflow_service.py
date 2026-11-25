@@ -30,6 +30,7 @@ from app.core.scheduling.hooks import (
 )
 from app.core.utils.encryption import decrypt_workflow_connections, encrypt_workflow_connections
 from app.crud.workflow_crud import WorkflowCRUD
+from app.services.amostras_de_dados import amostras_habilitadas
 from app.models.models import Schedule, Workflow
 from app.models.user import User
 from app.schemas.workflow import WorkflowUpdate
@@ -664,6 +665,7 @@ class WorkflowService:
         request: Request = None,
         debug_mode: bool = False,
         idempotency_key: str | None = None,
+        data_preview: bool = False,
         autenticar_entrada: bool = True,
         workflow: Workflow | None = None,
         triggered_by: str | None = None,
@@ -695,6 +697,11 @@ class WorkflowService:
         exist so the History can tell "scheduled at 03:00" from "manual · so-and-so".
         The "manual" default keeps old callers working.
         """
+        # The admin switch wins over the request (docs/specs/node-data-panels.md
+        # §4.3). Only read when asked, so cron and webhook pay nothing.
+        if data_preview:
+            data_preview = await amostras_habilitadas(self.crud.db)
+
         # ── 1. Idempotency ────────────────────────────────────────────────
         # The key is per USER and per WORKFLOW: it used to be global to the
         # installation, and two users sending `Idempotency-Key: 1` got each
@@ -707,7 +714,7 @@ class WorkflowService:
             _redis = _get_redis()
             existing = await _redis.get(cache_key)
             if existing:
-                return DispatchResult(id=existing)
+                return DispatchResult(id=existing, data_preview=data_preview)
 
         # ── 2. Carregar e descriptografar ─────────────────────────────────
         wf, definition = await self._load_workflow(id_hash, request, workflow=workflow)
@@ -808,6 +815,7 @@ class WorkflowService:
         # server's DB.
         result = await self._dispatch_job(
             wf, definition, candidates, inputs, debug_mode,
+            data_preview=data_preview,
             pre_resolved=pre_resolved,
             disabled_nodes=sorted(disabled_now),
             subworkflow_definitions=subworkflow_defs,
@@ -815,6 +823,8 @@ class WorkflowService:
             triggered_by=triggered_by,
             schedule_id=schedule_id,
         )
+
+        result.data_preview = data_preview
 
         # ── 7. Record idempotency (TTL: 24h) ─────────────────────────────
         if cache_key:
@@ -846,6 +856,7 @@ class WorkflowService:
         inputs: dict | None,
         debug_mode: bool,
         *,
+        data_preview: bool = False,
         pre_resolved: dict | None = None,
         disabled_nodes: list[str] | None = None,
         subworkflow_definitions: dict | None = None,
@@ -855,6 +866,7 @@ class WorkflowService:
     ) -> DispatchResult:
         return await _dispatch_job(
             wf, definition, candidates, inputs, debug_mode,
+            data_preview=data_preview,
             db=self.crud.db,
             pre_resolved=pre_resolved,
             disabled_nodes=disabled_nodes,

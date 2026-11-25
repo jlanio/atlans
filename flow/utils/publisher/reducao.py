@@ -45,11 +45,13 @@ CONTROL_FIELDS = (
 )
 
 # Keys of `extra` that carry the event's weight: error stack, debug mode's
-# inputs/outputs summary, batch of stdout lines and the schema drift diff
+# inputs/outputs summary, batch of stdout lines, the schema drift diff and the
+# editor's data sample (built to fit on its own, flow/executor/sample.py; listed
+# here as a defense against an executor that sends it oversized)
 # (`extra` is built by flow/executor/events.py and
 # flow/utils/publisher/events.py). `output_columns` is left OUT on purpose: it is
 # what the editor uses to suggest column names.
-HEAVY_EXTRA_KEYS = ("traceback", "debug_output", "lines", "schema_drift")
+HEAVY_EXTRA_KEYS = ("traceback", "debug_output", "lines", "schema_drift", "output_sample")
 
 # Character ceiling for each preserved control field, so the reduced event
 # itself cannot be large (nothing guarantees `node` is short — or

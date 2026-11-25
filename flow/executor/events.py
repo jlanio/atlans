@@ -137,3 +137,36 @@ def publish_debug(
         )
     except Exception as e:
         logger.warning("[debug_mode] Falha ao publicar evento debug para %s: %s", node_id, e)
+
+
+def publish_sample(
+    publisher,
+    task_id: str,
+    node_id: str,
+    node_defs: Dict[str, Any],
+    output_sample: dict,
+) -> None:
+    """Data sample of a node's outputs, for the editor's Entradas/Saídas panels.
+
+    An event of its own (`status: "sample"`), not a key of `completed`: it has
+    its own budget under the protocol ceiling, so a large sample can never push
+    the traceback or `output_columns` out of the lifecycle event through the
+    reduction. Only published with `data_preview` (docs/specs/node-data-panels.md).
+    """
+    try:
+        node_def = node_defs.get(node_id, {})
+        publisher.publish_event(
+            run_id=task_id,
+            node=node_id,
+            status="sample",
+            timestamp=time.time(),
+            extra={
+                "node_name": node_def.get("name", node_id),
+                "node_type": node_def.get("type", ""),
+                "output_sample": output_sample,
+            },
+            kind=KIND_DEBUG,
+            level=LEVEL_INFO,
+        )
+    except Exception as e:
+        logger.warning("[data_preview] Falha ao publicar amostra para %s: %s", node_id, e)

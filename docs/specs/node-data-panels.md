@@ -1,6 +1,6 @@
 # Spec — Node data panels (Entradas / Saídas)
 
-Status: approved, not implemented · Date: 2026-11-25
+Status: implemented · Date: 2026-11-25
 Scope: `flow/executor/` (sample builder), `executor/` (envelope), `app/` (execute payload),
 `web/app/components/workflow/node-config-modal/` and `web/app/stores/` (panels)
 Mockup: the interactive preview reviewed in the project thread (three columns, Schema / Tabela / JSON).
@@ -69,9 +69,10 @@ Non-goal (this round):
 data_preview: bool = Field(default=False, description="Send a data sample of each node's outputs (editor only)")
 ```
 
-The server computes the effective value as
-`payload.data_preview and node_data_preview_enabled` (§4.3) and returns it in the execute
-response as `data_preview: bool`, so the editor knows whether to wait for samples.
+`WorkflowService.start_analysis` computes the effective value as
+`data_preview and node_data_preview_enabled` (§4.3), before the idempotency check, and
+returns it on `DispatchResult.data_preview`; the route answers it as `data_preview: bool`,
+so the editor knows whether to wait for samples.
 
 The description of `debug_mode` is fixed at the same time: it says the executor "pauses at
 each node", which it does not.
@@ -218,21 +219,27 @@ In `_run_node_with_tracking`:
 - `eventKind`/raw tab: `sample` events are hidden from the Problems and Nodes tabs and
   shown in the Raw tab as a one-line `amostra: output (20 de 1.284 linhas)`.
 
-### 6.2 Components (`node-config-modal/data-view/`, new)
+### 6.2 Components (`node-config-modal/data-view.tsx`, new)
 
 | Component | Role |
 |---|---|
-| `DataView` | Takes `{ sample?, declared, alias, isPython, view }`, renders one of the three views or the empty state |
-| `SchemaView` | Tree: one row per output key (draggable, inserts `{{ Alias.key }}`), its columns or JSON keys below with type and first value |
-| `TableView` | Sticky header with name + type, numeric columns right-aligned with `tabular-nums`, geometry cell as `Polygon · 412 vért.`, footer `Mostrando 20 de 1.284 linhas · EPSG:4674` |
-| `JsonView` | Highlighted JSON; tables shown as their first 3 rows as objects |
-| `SourcePicker` | Input panel only: "Ligados a este nó" (direct parents, with the port each one feeds) then "Outros nós anteriores" (every ancestor, via `graph-traversal.ts`) |
-| `KeyTabs` | One button per output key when the node has more than one (`output`, `metadata`, `removed`…) |
-| `DataEmptyState` | "Ainda sem dados de execução", Run button, and the declared schema below. When the last run came back with `data_preview: false`: "Amostras de dados desligadas pelo administrador", no Run button |
+| `SeletorDeVisao` + `useVisaoLembrada` | Schema / Tabela / JSON switch, remembered per panel in `localStorage` (Tabela when a sample exists, Schema otherwise) |
+| `FilhosDaChave` | Schema view: under each output key, its columns or JSON keys with type and first value; falls back to the column names of `output_columns` without a sample |
+| `VisaoTabela` | Sticky header with name + type, numeric columns right-aligned with `tabular-nums`, geometry cell as `Polygon · 412 vért.` (WKT on hover), footer `Mostrando 20 de 1.284 linhas (amostra) · EPSG:4674` |
+| `VisaoJson` | Highlighted JSON; tables shown as their first 3 rows as objects; keys of a JSON output draggable |
+| `VisaoDaSaida` | Table or JSON of one output, with the "Esta saída não é uma tabela" fallback |
+| `AbasDeChave` | One button per output key when the node has more than one (`output`, `metadata`, `removed`…) |
+| `SemAmostra` | "Ainda sem dados de execução" / "não trouxe dados (histórico expirado)" / "Amostras de dados desligadas" |
+| `SeloAnterior` | "da execução anterior" on a stale sample |
+
+The source picker lives in `input-inspector.tsx`: "Ligados a este nó" (direct parents) then
+"Outros nós anteriores" (every other ancestor, nearest first, each once).
 
 Drag payloads keep the current rules of `input-inspector.tsx`:
 key → `{{ Alias.key }}`; column → column name; JSON leaf → `{{ Alias.key.path }}`;
-in the Python Script, the arrival variable name (`to_key || from_key`).
+in the Python Script, the arrival variable name (`to_key || from_key`), and a JSON leaf
+becomes `variavel["key"]`. An earlier node that is not wired is draggable as an expression,
+but not in the Python Script, where only edges create variables.
 The copy button stays on every draggable row.
 
 ### 6.3 Panels
@@ -240,10 +247,11 @@ The copy button stays on every draggable row.
 - `input-inspector.tsx` becomes `SourcePicker` + `KeyTabs` + `DataView`. It keeps what it
   has today and still matters: "Aguardando conexão" ports, the schema-drift warning, the
   per-edge arrival name (`key → variavel`), the status chip of the source node.
-- `output-preview.tsx` becomes `KeyTabs` + `DataView` for the node itself, plus:
-  the pin button (same action as `nodes-configuration/pin-section.tsx`), and a row-count
-  chip comparing `input_features` and `output_features` from the node status
-  (`1.284 linhas · era 144 na entrada`).
+- `output-preview.tsx` becomes `KeyTabs` + `DataView` for the node itself, plus a
+  "dados fixados" chip when the node is pinned. Pinning itself stays where it is, in the
+  central modal (`nodes-configuration/pin-section.tsx`), so there is one place to do it.
+  The row-count chip of the mockup (`1.284 linhas · era 144 na entrada`) is left for later:
+  `input_features` only exists in the persisted `node_stats`, not in the live node status.
 - View choice (Schema / Tabela / JSON) is remembered per panel in `localStorage`
   (try/catch, default Tabela when a sample exists, Schema otherwise).
 

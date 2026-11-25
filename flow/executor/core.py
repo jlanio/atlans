@@ -23,6 +23,7 @@ from flow.utils.safe_env import safe_env
 
 from flow.executor.node_manager import NodeManager
 from flow.executor.utils import _count_gdf_features, _output_columns, _build_debug_summary
+from flow.executor.sample import build_output_sample
 from flow.executor.spill import _spill_to_disk, _load_from_disk, _cleanup_spill, _delete_spill_files
 from flow.executor.rendering import expr_svc, render_node_parameters
 from flow.executor.edge_resolver import Edge, resolve_edge_inputs, resolve_edge_schema_inputs
@@ -81,6 +82,7 @@ class WorkflowExecutor:
         task_id: Optional[str] = None,
         publisher: Optional[WorkflowEventPublisher] = None,
         debug_mode: bool = False,
+        data_preview: bool = False,
         workspace_id: Optional[str] = None,
         workflow_hash: Optional[str] = None,
         pinned_outputs: Optional[Dict[str, Any]] = None,
@@ -96,6 +98,10 @@ class WorkflowExecutor:
         self.definition = definition
         self.publisher = publisher
         self.debug_mode = debug_mode
+        # Data sample of each node's outputs for the editor's panels
+        # (docs/specs/node-data-panels.md). Never in a nested run: the sub-workflow
+        # shares the parent's task_id and its nodes are not on the parent's canvas.
+        self.data_preview = bool(data_preview) and not is_nested
         self.workspace_id = workspace_id
         self.workflow_hash = workflow_hash
         self.pinned_outputs = pinned_outputs or {}
@@ -207,6 +213,21 @@ class WorkflowExecutor:
     def _publish_debug(self, node_id: str, inputs: dict, outputs: dict) -> None:
         _events.publish_debug(self.publisher, self.task_id, node_id, self.node_mgr.node_defs, inputs, outputs)
 
+    async def _publish_sample(self, node_id: str, outputs: Any) -> None:
+        """Publishes the data sample of `outputs` when `data_preview` is on.
+
+        Built in a thread: it reads only `head()` and summarizes geometries, but
+        still touches every column of those rows. Never fails the node.
+        """
+        if not (self.data_preview and self.publisher):
+            return
+        try:
+            sample = await asyncio.to_thread(build_output_sample, outputs)
+        except Exception as exc:
+            self.logger.warning("[%s] Amostra de dados falhou: %s", node_id, exc)
+            return
+        _events.publish_sample(self.publisher, self.task_id, node_id, self.node_mgr.node_defs, sample)
+
     def _publish_started(self, node_id: str) -> None:
         _events.publish_started(self.publisher, self.task_id, node_id, self.node_mgr.node_defs)
 
@@ -310,6 +331,7 @@ class WorkflowExecutor:
                                         output_columns=_output_columns(pinned))
             if self.debug_mode and self.publisher:
                 self._publish_debug(node_id, inputs, pinned)
+            await self._publish_sample(node_id, pinned)
             return node_id, pinned, 0.0
 
         node = self.node_mgr.nodes[node_id]
@@ -473,6 +495,11 @@ class WorkflowExecutor:
             # all_node_outputs): the debug summary needs the GDF's columns/bounds,
             # not the reference.
             self._publish_debug(node_id, inputs, outputs or {})
+
+        if status == "completed":
+            # `outputs` is the real payload, not the spilled dict (same reason as
+            # the debug event above).
+            await self._publish_sample(node_id, outputs or {})
 
         return node_id, outputs, duration_ms
 

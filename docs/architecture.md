@@ -952,6 +952,7 @@ flowchart LR
 | `failed` | When `node.execute()` raises an exception | `duration_ms`, `error`, `error_category`, `retryable`, `traceback` |
 | `skipped` | Node on an unselected branch | — |
 | `debug` | In debug_mode, after each node | Summary of inputs/outputs |
+| `sample` | With `data_preview` (runs started from the editor, unless the admin turned it off), after each completed or pinned node | `output_sample`: first rows of each output, summarized geometries ([spec](specs/node-data-panels.md)) |
 | `__workflow_complete__` | At the end of the workflow | `status`, `duration_ms`, `error` |
 
 > There is no distinct `cached` event: the pin output is published as `completed` with

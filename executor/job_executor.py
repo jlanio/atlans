@@ -530,6 +530,7 @@ async def _run_workflow(payload: dict, envelope: dict,
         "params":              dict,  — input parameters (optional)
         "workspace_id":        str,   — workspace_id for isolation (optional)
         "debug_mode":          bool,  — debug mode (optional)
+        "data_preview":        bool,  — data sample per node for the editor (optional)
       }
     """
     workflow_def = payload.get("workflow_definition")
@@ -544,6 +545,10 @@ async def _run_workflow(payload: dict, envelope: dict,
     workspace_id   = payload.get("workspace_id")
     workflow_hash  = payload.get("workflow_hash")
     debug_mode     = payload.get("debug_mode", False)
+    # Only a literal `true` turns it on: an old server never sends the key, and
+    # anything else (a string, a number) stays off — real data leaves the
+    # executor only when the server asked for it explicitly.
+    data_preview   = payload.get("data_preview") is True
     pinned_outputs = payload.get("pinned_outputs") or {}
     pin_metadata   = payload.get("pin_metadata") or {}
     # Snapshot of the nodes disabled at dispatch time. Used by
@@ -567,6 +572,7 @@ async def _run_workflow(payload: dict, envelope: dict,
         task_id=run_id,
         publisher=publisher,
         debug_mode=debug_mode,
+        data_preview=data_preview,
         workspace_id=workspace_id,
         workflow_hash=workflow_hash,
         pinned_outputs=pinned_outputs,
