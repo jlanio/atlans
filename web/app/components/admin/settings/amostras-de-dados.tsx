@@ -10,7 +10,7 @@ import { createToast } from "@/utils/createToast"
 import { FormSkeleton, CartaoDeErro } from "./estados"
 
 export const DATA_PREVIEW_HELP_TEXT =
-  "Quando ligado, execuções feitas pelo editor enviam as primeiras linhas de cada nó para os painéis Entradas e Saídas. Os dados ficam 1 hora no histórico da execução. Desligue onde os dados não podem sair dos executores, nem como amostra."
+  "Quando ligado, execuções feitas pelo editor enviam as primeiras linhas de cada nó para os painéis Entradas e Saídas. Os dados ficam 1 hora no histórico da execução, visível a quem pode ver o workflow, e desligar aqui não apaga o que já foi enviado. Desligue onde os dados não podem sair dos executores, nem como amostra."
 
 export function DataPreviewSection() {
   const [enabled, setEnabled] = useState<boolean | null>(null)

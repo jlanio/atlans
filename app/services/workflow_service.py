@@ -699,6 +699,7 @@ class WorkflowService:
         """
         # The admin switch wins over the request (docs/specs/node-data-panels.md
         # §4.3). Only read when asked, so cron and webhook pay nothing.
+        pediu_amostras = data_preview
         if data_preview:
             data_preview = await amostras_habilitadas(self.crud.db)
 
@@ -714,6 +715,13 @@ class WorkflowService:
             _redis = _get_redis()
             existing = await _redis.get(cache_key)
             if existing:
+                # What the ORIGINAL run was asked, not what the switch says now:
+                # the admin may have flipped it between the two requests. A key
+                # recorded before this field existed falls back to the current one.
+                if pediu_amostras:
+                    original = await _redis.get(f"{cache_key}:data_preview")
+                    if original is not None:
+                        data_preview = original in ("1", b"1")
                 return DispatchResult(id=existing, data_preview=data_preview)
 
         # ── 2. Carregar e descriptografar ─────────────────────────────────
@@ -831,6 +839,8 @@ class WorkflowService:
             try:
                 _redis = _get_redis()
                 await _redis.set(cache_key, result.id, ex=REDIS_TTL_24H)
+                if pediu_amostras:
+                    await _redis.set(f"{cache_key}:data_preview", "1" if data_preview else "0", ex=REDIS_TTL_24H)
             except Exception as exc:
                 _logger.warning("Falha ao registrar chave de idempotência no Redis: %s", exc)
 

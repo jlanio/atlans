@@ -832,6 +832,24 @@ def _events_availability(eventos: list, detalhe: Mapping[str, Any]) -> tuple[str
     )
 
 
+def _sem_amostra(evento: Mapping) -> Mapping:
+    """A `sample` event without its `output_sample`.
+
+    The editor's data sample (docs/specs/node-data-panels.md) carries up to
+    ~48 KB of the node's real rows: 200 of them would be megabytes in the
+    agent's context, and the data would leave through a path the panels never
+    needed. The event stays: it still says the node produced data.
+    """
+    if evento.get("status") != "sample":
+        return evento
+    extra = evento.get("extra")
+    if not isinstance(extra, Mapping) or "output_sample" not in extra:
+        return evento
+    resto = {k: v for k, v in extra.items() if k != "output_sample"}
+    resto["output_sample_omitted"] = True
+    return {**evento, "extra": resto}
+
+
 @ferramenta
 async def get_run_events(ctx: Context, run_id: str, limit: int = MAX_EVENTS) -> dict:
     """The raw log of a run, in the order it was published.
@@ -881,7 +899,7 @@ async def get_run_events(ctx: Context, run_id: str, limit: int = MAX_EVENTS) -> 
         except RunNotFoundError as exc:
             raise _run_not_found() from exc
 
-    eventos = [e for e in (bruto.get("events") or []) if isinstance(e, Mapping)]
+    eventos = [_sem_amostra(e) for e in (bruto.get("events") or []) if isinstance(e, Mapping)]
     availability, explanation = _events_availability(eventos, detalhe)
 
     # Drop the OLDEST: whoever investigates a failure wants the end of the log,

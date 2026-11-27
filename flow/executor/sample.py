@@ -14,8 +14,15 @@ Pure and bounded on purpose:
 - the result is MEASURED serialized against `budget_bytes` and cut until it
   fits, so the event stays under the protocol ceiling
   (flow/utils/publisher/reducao.py) without the reduction having to drop it;
-- every string goes through the live-secret redaction, and columns or keys with
-  a sensitive name have their values replaced.
+- every string goes through the pattern redaction of the log (Bearer, Basic,
+  DSN with a password, `token=`, `authkey=`, PATs, AWS keys, PEM blocks —
+  flow/utils/redacao_log.py) and through the live-secret redaction; columns or
+  keys with a sensitive name have their WHOLE value replaced, even a list or a
+  dict.
+
+The live-secret redaction alone is not enough: `segredos_vivos.in_use` only
+covers the instant a node uses a credential (the WFS fetch), and the sample is
+built after the node returns, when that list is usually empty again.
 """
 import json
 import math
@@ -24,6 +31,7 @@ from datetime import date, datetime, time as dtime
 from decimal import Decimal
 from typing import Any
 
+from flow.utils.redacao_log import scrub_text
 from flow.utils.segredos_vivos import redact_text
 
 SAMPLE_VERSION = 1
@@ -41,12 +49,21 @@ JSON_MAX_ITEMS = 20
 # Keys that are not data for the panel: the artifact and response envelopes.
 SKIPPED_KEYS = frozenset({"__artifact__", "__response__"})
 
-_SENSITIVE = re.compile(r"pass(word|wd)?|secret|token|api[_-]?key|authorization|senha", re.IGNORECASE)
+_SENSITIVE = re.compile(
+    r"pass(word|wd)?|secret|token|api[_-]?key|authorization|senha|cookie|credential|private[_-]?key",
+    re.IGNORECASE,
+)
 _MASK = "***"
 
 
+def _redact(texto: str) -> str:
+    return scrub_text(redact_text(texto))
+
+
 def _cut(texto: str, limite: int) -> str:
-    texto = redact_text(texto)
+    # Sliced before the redaction: `str()` of a cell can be huge, and the patterns
+    # only need a margin past the limit to see a secret that starts inside it.
+    texto = _redact(texto[: limite * 4])
     return texto if len(texto) <= limite else texto[:limite] + "…"
 
 
@@ -98,13 +115,43 @@ def _geometry_cell(geom) -> "dict | None":
             return {"type": geom.geom_type, "vertices": 0, "wkt": f"{geom.geom_type.upper()} EMPTY"}
         import shapely
         vertices = int(shapely.get_num_coordinates(geom))
-        # `wkt` of a 7,000-vertex polygon is hundreds of KB: the rounded writer with
-        # a ceiling on the output avoids building it whole.
+        if vertices > WKT_FULL_MAX_VERTICES:
+            # `to_wkt` has no ceiling: it writes the whole geometry (tens of MB for
+            # a boundary with a million vertices) only for 80 characters to be
+            # kept. Only the first coordinates are written here.
+            return {"type": geom.geom_type, "vertices": vertices, "wkt": _wkt_prefix(geom)}
         wkt = shapely.to_wkt(geom, rounding_precision=5, trim=True)
         return {"type": geom.geom_type, "vertices": vertices,
                 "wkt": wkt if len(wkt) <= WKT_CHARS else wkt[:WKT_CHARS] + "…"}
     except Exception:
         return {"type": getattr(geom, "geom_type", "Geometry"), "vertices": None, "wkt": None}
+
+
+# Above this, the WKT is not written whole (see `_wkt_prefix`).
+WKT_FULL_MAX_VERTICES = 64
+
+# How many "(" open each type's coordinate list in WKT.
+_WKT_DEPTH = {"LineString": 1, "LinearRing": 1, "MultiPoint": 1,
+              "Polygon": 2, "MultiLineString": 2, "MultiPolygon": 3}
+
+
+def _num(v: float) -> str:
+    texto = f"{v:.5f}".rstrip("0").rstrip(".")
+    return "0" if texto in ("", "-0") else texto
+
+
+def _wkt_prefix(geom) -> str:
+    """The start of the WKT of a large geometry, cut at `WKT_CHARS` and ended
+    with "…", without writing the rest. A GeometryCollection (no single
+    coordinate list) gives only its type.
+    """
+    import shapely
+    profundidade = _WKT_DEPTH.get(geom.geom_type)
+    if profundidade is None:
+        return f"{geom.geom_type.upper()} (…"
+    coords = shapely.get_coordinates(geom)[:WKT_CHARS // 4]
+    pares = ", ".join(f"{_num(x)} {_num(y)}" for x, y in coords)
+    return f"{geom.geom_type.upper()} {'(' * profundidade}{pares}"[:WKT_CHARS] + "…"
 
 
 def _cell(valor: Any, max_cell: int) -> Any:
@@ -212,7 +259,10 @@ def _json_value(valor: Any, depth: int, max_cell: int) -> "tuple[Any, bool]":
             if i >= JSON_MAX_ITEMS:
                 break
             chave = _cut(str(k), max_cell)
-            if _is_sensitive(chave) and v is not None and not isinstance(v, (dict, list, tuple)):
+            if _is_sensitive(chave) and v is not None:
+                # The whole value, whatever its shape: `{"token": ["abc"]}` or
+                # `{"credentials": {"user": …, "pass": …}}` leaked when only
+                # scalars were masked.
                 out[chave] = _MASK
                 continue
             out[chave], c = _json_value(v, depth + 1, max_cell)

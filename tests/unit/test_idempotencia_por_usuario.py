@@ -128,3 +128,18 @@ async def test_without_user_the_key_carries_a_dash(service, redis):
 async def test_without_key_nothing_is_stored(service, redis):
     await service.start_analysis("wf-1", triggered_by="usr-a")
     assert redis.gravacoes == []
+
+
+@pytest.mark.asyncio
+async def test_replay_reports_the_original_data_preview_not_the_current_switch(service, redis):
+    """The editor tells "no sample yet" from "samples turned off" by the response:
+    a retried request must answer what the ORIGINAL run was asked, even after
+    the admin flipped the switch in between."""
+    switch = AsyncMock(return_value=True)
+    with patch("app.services.workflow_service.amostras_habilitadas", switch):
+        a = await service.start_analysis("wf-1", idempotency_key="k", triggered_by="usr-a", data_preview=True)
+        switch.return_value = False
+        b = await service.start_analysis("wf-1", idempotency_key="k", triggered_by="usr-a", data_preview=True)
+    assert a.id == b.id == "task-1"
+    assert a.data_preview is True and b.data_preview is True
+    assert service._dispatch_job.await_count == 1

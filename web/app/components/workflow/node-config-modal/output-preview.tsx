@@ -39,7 +39,8 @@ const OutputPreview = ({ nodeFound }: OutputPreviewProps) => {
   // The configured outputs, not the catalog's: in the Python Script they come
   // from `output_vars`, and the panel always showed "result" even after the
   // person had renamed the script's own variables.
-  const staticFields = saidasDoNo(nodeFound.data)
+  // Memoized: a new array on every render made the `chaves` memo below useless.
+  const staticFields = useMemo(() => saidasDoNo(nodeFound.data), [nodeFound.data])
   const alias = resolveNodeAlias(nodeFound.data ?? {}) || nodeFound.id.slice(0, 8)
 
   const chaves = useMemo(() => {

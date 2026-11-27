@@ -128,6 +128,49 @@ def test_segredo_em_uso_e_colunas_sensiveis_saem_mascarados():
     assert sample["cfg"]["value"] == {"token": "***", "host": "db.local", "nota": "chave ***"}
 
 
+def test_segredos_por_padrao_saem_mesmo_fora_de_in_use():
+    """The sample is built after the node returns: `in_use` is over by then, so
+    the log's pattern redaction is what catches a DSN, a Bearer or a `token=`."""
+    df = pd.DataFrame({"dsn": ["postgresql://geo:hunter2hunter2@db/gis"],  # pragma: allowlist secret
+                       "url": ["https://api?token=abcdef123456&x=1"]})  # pragma: allowlist secret
+    sample = build_output_sample({
+        "output": df,
+        "resp": {"msg": "Authorization: Bearer abcdefghijklmnopqrstuvwxyz0123"},  # pragma: allowlist secret
+    })["outputs"]
+    dsn, url = sample["output"]["rows"][0]
+    assert "hunter2hunter2" not in dsn and dsn.startswith("postgresql://geo:")
+    assert "abcdef123456" not in url  # pragma: allowlist secret
+    assert "abcdefghijklmnopqrstuvwxyz0123" not in sample["resp"]["value"]["msg"]
+
+
+def test_chave_sensivel_mascara_lista_dict_e_cookie():
+    sample = build_output_sample({"resp": {
+        "token": ["abc123456"],  # pragma: allowlist secret
+        "credentials": {"user": "u", "pass": "p"},  # pragma: allowlist secret
+        "headers": {"Set-Cookie": "sessionid=xyz987654", "Content-Type": "application/json"},
+        "vazio": None,
+    }})["outputs"]["resp"]["value"]
+    assert sample["token"] == "***"
+    assert sample["credentials"] == "***"
+    assert sample["headers"] == {"Set-Cookie": "***", "Content-Type": "application/json"}
+    assert sample["vazio"] is None
+
+
+def test_geometria_grande_nao_escreve_o_wkt_inteiro(monkeypatch):
+    import shapely
+    grande = Point(0, 0).buffer(10, quad_segs=2000)
+    esperado = shapely.to_wkt(grande, rounding_precision=5, trim=True)[:80]
+
+    def proibido(*_a, **_k):
+        raise AssertionError("to_wkt chamado numa geometria grande")
+
+    monkeypatch.setattr(shapely, "to_wkt", proibido)
+    gdf = gpd.GeoDataFrame({"n": [1]}, geometry=[grande])
+    cel = build_output_sample({"output": gdf})["outputs"]["output"]["rows"][0][-1]
+    assert cel["vertices"] > 7000
+    assert cel["wkt"] == esperado + "…"
+
+
 def test_cabe_no_orcamento_cortando_linhas_depois_colunas_depois_saidas():
     largas = pd.DataFrame({f"c{i}": ["z" * 120] * 20 for i in range(40)})
     sample = build_output_sample({"a": largas, "b": largas.copy()})

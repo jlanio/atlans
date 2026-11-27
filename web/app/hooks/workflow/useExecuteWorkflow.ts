@@ -455,8 +455,10 @@ export const useExecuteWorkflow = () => {
     }
 
     // The previous samples stay visible, marked as stale, until this run
-    // replaces them node by node. `data_preview: false` back = admin switch off.
-    useNodeSamplesStore.getState().beginRun(id, taskId, respExec?.data?.data_preview === true)
+    // replaces them node by node. Only an explicit `data_preview: false` back
+    // means the admin switch is off: a response without the field (a server
+    // older than the panels) must not tell the person the admin turned it off.
+    useNodeSamplesStore.getState().beginRun(id, taskId, respExec?.data?.data_preview !== false)
 
     // If this instance is not the socket owner (the trigger came from the webhook's
     // "Testar" tab, for example), it hands the run to whoever governs — instead
