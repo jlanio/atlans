@@ -33,7 +33,7 @@ import { useResizablePanel } from "@/app/hooks/useResizablePanel"
 import { executarNoEditor } from "@/app/hooks/workflow/useExecuteWorkflow"
 import { useWorkflowExecutionStore } from "@/app/stores/workflowExecutionStore"
 import { createToast } from "@/utils/createToast"
-import { aceitaInsercao, alvoDoCampo, definirAlvo } from "./insercao"
+import { aceitaInsercao, alvoDoCampo, definirAlvo, ehOutroControle } from "./insercao"
 
 // Classes shared by the side panels (Input / Output) and the central modal.
 // Centralizing them avoids visual drift among the 3 panels when adjusting width/shadow.
@@ -224,8 +224,16 @@ const NodeConfigModal = () => {
     }
     const pendente = JSON.stringify(nodeFound.data.properties) !== JSON.stringify(values)
     if (pendente) {
+      const fixado = pinnedNodes.some(p => p.node_id === nodeFound.id && !p.expired)
       const escrito = aplicarNoCanvas()
       if (!escrito) return
+      // Same as Aplicar: says so, since Cancelar can no longer undo it.
+      createToast.info(
+        "Alterações aplicadas para executar",
+        fixado
+          ? "A execução usa o formulário como está. Os dados fixados deste nó foram liberados, porque os parâmetros mudaram."
+          : "A execução usa o formulário como está; Cancelar não desfaz mais estas alterações.",
+      )
       // The canvas is controlled: the store sees the new node a render later.
       const alvo = JSON.stringify(escrito.data.properties)
       for (let i = 0; i < 30 && JSON.stringify(getNode(escrito.id)?.data.properties) !== alvo; i++) {
@@ -295,7 +303,12 @@ const NodeConfigModal = () => {
         <div
           className={MODAL_BOX}
           // The last text field focused here is where a click in Entradas inserts.
-          onFocusCapture={e => { if (aceitaInsercao(e.target)) definirAlvo(alvoDoCampo(e.target)) }}
+          // Any other form control drops it, so a click never lands in a field the
+          // person has already left.
+          onFocusCapture={e => {
+            if (aceitaInsercao(e.target)) definirAlvo(alvoDoCampo(e.target))
+            else if (ehOutroControle(e.target)) definirAlvo(null)
+          }}
         >
         {/* Rich header with the type's icon and color */}
         {(() => {
@@ -320,6 +333,8 @@ const NodeConfigModal = () => {
                   <div className="group flex items-center gap-1">
                     <input
                       type="text"
+                      // The node's name, not a parameter: never a target of click-to-insert.
+                      data-sem-insercao
                       value={aliasTitle}
                       placeholder={nodeFound?.data.alias ?? ""}
                       className={`w-full px-1 text-sm font-medium text-foreground bg-transparent border-b transition-colors outline-none ${

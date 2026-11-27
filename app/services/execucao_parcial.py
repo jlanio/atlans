@@ -50,6 +50,17 @@ def ate_o_no(definition: Mapping[str, Any], node_id: str) -> dict:
                 manter.add(pai)
                 fila.append(pai)
 
+    # Same rule as a full run (flow/core/graph.py, filter_trigger_reachable): in
+    # a workflow with triggers, a node no trigger leads to never runs. Cut down
+    # to it alone, the definition would have no trigger left, the filter would
+    # not apply, and it would run here when it never runs for real.
+    gatilhos = {n.get("id") for n in nodes if n.get("type") == "trigger"}
+    if gatilhos and not (gatilhos & manter):
+        raise WorkflowInputValidationError(
+            "Este nó não está ligado a nenhum gatilho, então não roda numa execução. "
+            "Ligue-o ao fluxo para ver os dados dele."
+        )
+
     podada = dict(definition)
     podada["nodes"] = [n for n in nodes if n.get("id") in manter]
     podada["edges"] = [

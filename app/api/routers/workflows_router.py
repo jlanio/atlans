@@ -586,7 +586,9 @@ async def execute_workflow(
             # dimensions — the credentials of THIS user are resolved, plus those
             # shared with the workflow's workspace.
             triggered_by=current_user.id_hash,
-            trigger_source="manual",
+            # A partial run ("Executar até este nó") is told apart in the History
+            # and is not what the editor seeds the nodes after its target from.
+            trigger_source="partial" if payload.run_until else "manual",
             # Whoever gets here has already passed through the session and has the operator role. The
             # trigger token authenticates an EXTERNAL CALL to the webhook endpoint;
             # requiring it here only compared the user's JWT with the token and

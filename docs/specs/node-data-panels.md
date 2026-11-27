@@ -279,6 +279,10 @@ keeps its current width. Below `lg` the side panels are hidden and the modal sho
   ancestors before every check (`app/services/execucao_parcial.py`), so an old executor
   runs it like any other. The modal applies its pending form to the canvas first, and
   the run goes through the canvas's runner (`executarNoEditor`), which saves first.
+  The run is recorded with `trigger_source="partial"` ("parcial" in the History); when
+  the editor opens, the nodes after a partial run's target are seeded from the last
+  full run (marked "da execução anterior"). A node no trigger leads to is refused
+  (422), the same as a full run never running it.
 - **Click to insert.** The last text field focused in the modal (or a Monaco editor)
   is the target; clicking a key, column or JSON key in Entradas inserts at its caret
   (`node-config-modal/insercao.ts`). With no target, it copies. Dragging still works.

@@ -149,7 +149,7 @@ async def list_runs(
     date_to:     Optional[str] = Query(None, description="ISO 8601 — fim do período"),
     worker_host: Optional[str] = Query(None, description="Filtrar por hostname do worker"),
     trigger_source: Optional[str] = Query(
-        None, pattern="^(manual|retry|webhook|schedule|mcp)$", description="Origem do disparo",
+        None, pattern="^(manual|retry|webhook|schedule|mcp|partial)$", description="Origem do disparo",
     ),
     tier: Optional[str] = Query(
         None, pattern="^(primary|fallback|pool)$", description="Nível da política em que rodou",

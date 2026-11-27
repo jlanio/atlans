@@ -167,6 +167,28 @@ describe("clique para inserir", () => {
     input.parentElement!.remove()
   })
 
+  it("focar outro controle (número, select) larga o campo anterior", async () => {
+    const { input } = campo("Nome")
+    definirAlvo(alvoDoCampo(input))
+    const { ehOutroControle } = await import("@/app/components/workflow/node-config-modal/insercao")
+    const numero = document.createElement("input")
+    numero.type = "number"
+    expect(ehOutroControle(numero)).toBe(true)
+    expect(ehOutroControle(document.createElement("select"))).toBe(true)
+    expect(ehOutroControle(document.createElement("button"))).toBe(false)
+    input.parentElement!.remove()
+  })
+
+  it("campo que recusa o valor: não diz que inseriu", async () => {
+    const { inserirNoAlvo } = await import("@/app/components/workflow/node-config-modal/insercao")
+    const { input } = campo("Alias", "abc")
+    // A controlled field that rejects: puts the old value back on input.
+    input.addEventListener("input", () => { input.value = "abc" })
+    definirAlvo(alvoDoCampo(input))
+    expect(inserirNoAlvo("{{ X.y }}")).toEqual({ rotulo: "Alias", aceitou: false })
+    input.parentElement!.remove()
+  })
+
   it("sem campo selecionado, a dica explica como inserir", () => {
     render(<InputInspector nodeFound={clip} />)
     expect(screen.getByText(/Selecione um campo do formulário/)).toBeInTheDocument()

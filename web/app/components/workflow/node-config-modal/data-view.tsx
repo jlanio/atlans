@@ -125,8 +125,12 @@ export function copiar(texto: string) {
  *  when no field was selected yet (and the toast says how to insert directly). */
 export function inserirOuCopiar(texto: string) {
   const onde = inserirNoAlvo(texto)
+  if (onde?.aceitou) {
+    createToast.success(`Inserido em “${onde.rotulo}”`, texto)
+    return
+  }
   if (onde) {
-    createToast.success(`Inserido em “${onde}”`, texto)
+    createToast.info(`“${onde.rotulo}” não aceitou ${texto}`, "Selecione outro campo e clique de novo.")
     return
   }
   copiar(texto)
@@ -159,7 +163,7 @@ export function BotaoExecutarAteAqui({ onExecutar, executando, compacto = false 
       type="button"
       onClick={onExecutar}
       disabled={executando}
-      title="Roda só este nó e os nós de que ele depende"
+      title="Aplica o formulário e roda só este nó e os nós de que ele depende"
       className={cn(
         "inline-flex items-center justify-center gap-1.5 rounded-md bg-primary font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-70",
         compacto ? "min-h-8 px-2.5 text-[11px]" : "min-h-9 px-3 text-xs",

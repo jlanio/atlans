@@ -44,7 +44,7 @@ class WorkflowRun(Base):
     # policy changes later. Null on runs predating the column.
     dispatch_tier = Column(String(8), nullable=True)
     # Trigger source and who triggered it (docs/specs/metrics-history.md §2):
-    # "manual" | "retry" | "webhook" | "schedule". `triggered_by` is the user's
+    # "manual" | "retry" | "webhook" | "schedule" | "mcp" | "partial". `triggered_by` is the user's
     # id_hash on authenticated routes; null for webhook and schedule. Runs
     # predating the column stay null — the screen shows "—".
     trigger_source = Column(String(16), nullable=True)

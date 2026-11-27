@@ -124,3 +124,15 @@ describe("Executar só despacha com o canvas salvo", () => {
     expect(await executarNoEditor({}, { runUntil: "n1" })).toBe(false)
   })
 })
+
+describe("runsParaSemear", () => {
+  it("parciais por cima da última completa, da mais antiga para a mais nova", async () => {
+    const { runsParaSemear } = await import("@/app/hooks/workflow/useExecuteWorkflow")
+    const r = (run_id: string, trigger_source: string) => ({ run_id, trigger_source })
+    expect(runsParaSemear([r("p2", "partial"), r("p1", "partial"), r("c1", "manual"), r("c0", "manual")]).map(x => x.run_id))
+      .toEqual(["c1", "p1", "p2"])
+    expect(runsParaSemear([r("c1", "schedule"), r("c0", "manual")]).map(x => x.run_id)).toEqual(["c1"])
+    expect(runsParaSemear([])).toEqual([])
+  })
+})
+

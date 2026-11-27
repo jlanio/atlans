@@ -479,7 +479,7 @@ async def list_runs(
 
     Filter by workflow (id or name), workspace, `status`
     (`success`/`failed`/`running`/`cancelled`), origin (`trigger_source`:
-    `manual`, `schedule`, `webhook`, `mcp`), date window (ISO-8601) and text
+    `manual`, `schedule`, `webhook`, `mcp`, `partial`), date window (ISO-8601) and text
     (`q`, over the WORKFLOW NAME and the RUN ID — the error message is not
     included in the search).
 

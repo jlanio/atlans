@@ -20,7 +20,7 @@ def _definicao():
         ("filtro", "buffer"), ("buffer", "salvar"), ("salvar", "email"),
     ]
     return {
-        "nodes": [{"id": n, "name": n} for n in nos],
+        "nodes": [{"id": n, "name": n, "type": "trigger" if n == "gatilho" else "action"} for n in nos],
         "edges": [{"id": f"{a}-{b}", "source": a, "target": b} for a, b in arestas],
         "settings": {"timeout": 30},
     }
@@ -51,6 +51,19 @@ def test_arestas_orfas_ou_quebradas_sao_ignoradas():
     podada = ate_o_no(d, "buffer")
     assert {n["id"] for n in podada["nodes"]} == {"gatilho", "wfs", "filtro", "buffer"}
     assert len(podada["edges"]) == 4
+
+
+def test_no_que_nenhum_gatilho_alcanca_e_422():
+    """`outro` has no edges: a full run never runs it, so neither does this."""
+    with pytest.raises(WorkflowInputValidationError, match="gatilho"):
+        ate_o_no(_definicao(), "outro")
+
+
+def test_workflow_sem_gatilho_nenhum_roda_o_trecho():
+    d = _definicao()
+    for n in d["nodes"]:
+        n["type"] = "action"
+    assert {n["id"] for n in ate_o_no(d, "wfs")["nodes"]} == {"gatilho", "wfs"}
 
 
 def test_no_inexistente_e_422():

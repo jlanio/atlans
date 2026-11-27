@@ -135,13 +135,14 @@ function exposeInsert(
   onEditorReady?: (fn: (text: string) => void) => void,
   label?: string,
 ) {
-  const inserir = (text: string) => {
+  const inserir = (text: string): boolean => {
     const selection = editor.getSelection()
-    if (!selection) return
+    if (!selection) return false
     editor.executeEdits("insert-hint", [{ range: selection, text, forceMoveMarkers: true }])
     editor.focus()
+    return true
   }
-  onEditorReady?.(inserir)
+  onEditorReady?.((text: string) => { inserir(text) })
   // Click to insert from the Entradas panel (node-config-modal/insercao.ts):
   // focusing the editor makes it the target, at its own caret.
   editor.onDidFocusEditorText(() => {

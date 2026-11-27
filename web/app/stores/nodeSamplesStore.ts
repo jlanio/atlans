@@ -32,8 +32,10 @@ interface NodeSamplesActions {
   beginRun(workflowId: string, runId: string, dataPreview: boolean): void
   /** One `sample` event arrived (live or from the replay). */
   apply(workflowId: string, runId: string, nodeId: string, sample: AmostraDoNo): void
-  /** Samples read from the history of a finished run, when the workflow opens. */
-  seedFromHistory(workflowId: string, runId: string, samples: Record<string, AmostraDoNo>): void
+  /** Samples read from the history of finished runs, when the workflow opens.
+   *  `runId` is the newest of them; `runIdPorNo` says which run each sample came
+   *  from (an older full run under a partial one), and those show as stale. */
+  seedFromHistory(workflowId: string, runId: string, samples: Record<string, AmostraDoNo>, runIdPorNo?: Record<string, string>): void
   clear(): void
 }
 
@@ -65,11 +67,14 @@ export const useNodeSamplesStore = create<NodeSamplesState & NodeSamplesActions>
     }
   }),
 
-  seedFromHistory: (workflowId, runId, samples) => set(state => {
+  seedFromHistory: (workflowId, runId, samples, runIdPorNo = {}) => set(state => {
     // A run started in this session already owns the panels.
     if (state.workflowId === workflowId && state.runId) return {}
     const byNode: Record<string, AmostraRegistrada> = {}
-    for (const [id, sample] of Object.entries(samples)) byNode[id] = { sample, runId, stale: false }
+    for (const [id, sample] of Object.entries(samples)) {
+      const deQual = runIdPorNo[id] ?? runId
+      byNode[id] = { sample, runId: deQual, stale: deQual !== runId }
+    }
     return { workflowId, runId, byNode, disabledByAdmin: false }
   }),
 

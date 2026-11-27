@@ -11,6 +11,7 @@ import { getWsUrl } from "@/utils/env"
 import { useWorkflowExecutionStore, toRunEvent, eventKind, RawEvent, MAX_RUN_EVENTS, RUN_TERMINAL } from "@/app/stores/workflowExecutionStore"
 import { useKnownColumnsStore } from "@/app/stores/knownColumnsStore"
 import { useNodeSamplesStore, amostraDoEvento, amostrasDosEventos } from "@/app/stores/nodeSamplesStore"
+import type { AmostraDoNo } from "@/types/amostra"
 
 /** Synthetic id the backend uses to signal the end of the run. */
 const WF_COMPLETE = "__workflow_complete__"
@@ -78,6 +79,18 @@ const RUN_NOT_SAVED: Record<SaveSkipReason, [titulo: string, descricao?: string]
  *  watching. Whoever triggers without being the owner hands the task_id to the
  *  owner to attach. */
 let attachToOwner: ((taskId: string) => void) | null = null
+
+/** The finished runs whose columns and samples seed the editor when it opens:
+ *  the newest, and — while those are partial runs ("Executar até este nó") —
+ *  the ones before it down to the last full run. Oldest first. At most 5. */
+export function runsParaSemear<T extends { run_id: string; trigger_source?: string | null }>(recentes: T[]): T[] {
+  const escolhidos: T[] = []
+  for (const run of recentes.slice(0, 5)) {
+    escolhidos.push(run)
+    if (run.trigger_source !== "partial") break
+  }
+  return escolhidos.reverse()
+}
 
 type OpcoesDeExecucao = { runUntil?: string }
 
@@ -917,8 +930,11 @@ export const useExecuteWorkflow = () => {
     const aborted = () => cancelled || openedFor !== id
 
     ;(async () => {
-      const resp = await GisFlowService.getObservabilityRuns({ workflow_id: id, limit: 1 })
-      const latest = resp?.data?.runs?.[0]
+      // A few runs, not one: when the latest is a partial run ("Executar até este
+      // nó"), the nodes after its target come from the last full run (below).
+      const resp = await GisFlowService.getObservabilityRuns({ workflow_id: id, limit: 5 })
+      const recentes = resp?.data?.runs ?? []
+      const latest = recentes[0]
       // Aborts if the workflow changed during the await, if there is no run, or if it
       // is not alive. If a manual trigger started in this mount, it does not clobber.
       if (aborted() || !latest) return
@@ -936,32 +952,43 @@ export const useExecuteWorkflow = () => {
         //
         // A LIVE run does not pass through here on purpose: the WebSocket replay
         // redelivers the history and writes the columns through the live path (`fresh`).
-        const detalhe = await GisFlowService.getRunDetail(latest.run_id)
-        if (aborted()) return
-        const stats = detalhe?.data?.node_stats ?? {}
-        const columnsByNode: Record<string, { porPorta: Record<string, string[]>; parciais?: boolean }> = {}
-        for (const [nodeId, stat] of Object.entries(stats)) {
-          if (stat?.output_columns) {
-            // `__truncated__` = the executor's 8KB cut reduced each list to the
-            // first 50 — the suggestion label warns "lista parcial" (partial list).
-            columnsByNode[nodeId] = { porPorta: stat.output_columns, parciais: !!stat.__truncated__ }
-          }
-        }
-        if (Object.keys(columnsByNode).length > 0) {
-          useKnownColumnsStore.getState().semearDoHistorico(id, latest.run_id, columnsByNode)
-        }
-        // The data samples of that run, while its history lives (1 h in Redis).
-        // Best-effort like the columns: an expired or forbidden history leaves
-        // the panels on their empty state.
-        try {
-          const eventos = await GisFlowService.getRunEvents(latest.run_id)
+        // A partial run only covers its target and what feeds it: the runs to
+        // seed from are the partial ones on top of the last full run, oldest
+        // first, so a newer run's node wins over an older one's.
+        const aSemear = runsParaSemear(recentes)
+        const amostras: Record<string, AmostraDoNo> = {}
+        const runDaAmostra: Record<string, string> = {}
+        for (const run of aSemear) {
+          const detalhe = await GisFlowService.getRunDetail(run.run_id)
           if (aborted()) return
-          const amostras = amostrasDosEventos(eventos?.data?.events ?? [])
-          if (Object.keys(amostras).length > 0) {
-            useNodeSamplesStore.getState().seedFromHistory(id, latest.run_id, amostras)
+          const stats = detalhe?.data?.node_stats ?? {}
+          const columnsByNode: Record<string, { porPorta: Record<string, string[]>; parciais?: boolean }> = {}
+          for (const [nodeId, stat] of Object.entries(stats)) {
+            if (stat?.output_columns) {
+              // `__truncated__` = the executor's 8KB cut reduced each list to the
+              // first 50 — the suggestion label warns "lista parcial" (partial list).
+              columnsByNode[nodeId] = { porPorta: stat.output_columns, parciais: !!stat.__truncated__ }
+            }
           }
-        } catch {
-          // a hint, not state
+          if (Object.keys(columnsByNode).length > 0) {
+            useKnownColumnsStore.getState().semearDoHistorico(id, run.run_id, columnsByNode)
+          }
+          // The data samples of that run, while its history lives (1 h in Redis).
+          // Best-effort like the columns: an expired or forbidden history leaves
+          // the panels on their empty state.
+          try {
+            const eventos = await GisFlowService.getRunEvents(run.run_id)
+            if (aborted()) return
+            for (const [nodeId, amostra] of Object.entries(amostrasDosEventos(eventos?.data?.events ?? []))) {
+              amostras[nodeId] = amostra
+              runDaAmostra[nodeId] = run.run_id
+            }
+          } catch {
+            // a hint, not state
+          }
+        }
+        if (Object.keys(amostras).length > 0) {
+          useNodeSamplesStore.getState().seedFromHistory(id, latest.run_id, amostras, runDaAmostra)
         }
         return
       }

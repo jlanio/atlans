@@ -95,3 +95,16 @@ describe("leitura dos eventos", () => {
     expect(resumoDaAmostra(undefined)).toBe("amostra indisponível")
   })
 })
+
+describe("semear de várias execuções", () => {
+  it("amostras de uma execução completa mais antiga, sob uma parcial, aparecem como anteriores", () => {
+    useNodeSamplesStore.getState().clear()
+    useNodeSamplesStore.getState().seedFromHistory(
+      "wf", "parcial", { A: { version: 1, outputs: {} }, B: { version: 1, outputs: {} } }, { A: "parcial", B: "completa" },
+    )
+    const { byNode } = useNodeSamplesStore.getState()
+    expect(byNode.A).toMatchObject({ runId: "parcial", stale: false })
+    expect(byNode.B).toMatchObject({ runId: "completa", stale: true })
+  })
+})
+

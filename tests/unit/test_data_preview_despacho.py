@@ -158,8 +158,11 @@ async def test_execute_repassa_executar_ate_este_no(rota_execute):
     resp = await ac.post("/workflows/wf-1/execute", json={"inputs": {}, "run_until": "no-7"})
     assert resp.status_code == 202, resp.text
     assert svc.start_analysis.await_args.kwargs["run_until"] == "no-7"
+    # Told apart in the History: the editor does not seed later nodes from it.
+    assert svc.start_analysis.await_args.kwargs["trigger_source"] == "partial"
     await ac.post("/workflows/wf-1/execute", json={"inputs": {}})
     assert svc.start_analysis.await_args.kwargs["run_until"] is None
+    assert svc.start_analysis.await_args.kwargs["trigger_source"] == "manual"
 
 
 @pytest.fixture
