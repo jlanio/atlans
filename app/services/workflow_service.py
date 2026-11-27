@@ -30,6 +30,8 @@ from app.core.scheduling.hooks import (
 )
 from app.core.utils.encryption import decrypt_workflow_connections, encrypt_workflow_connections
 from app.crud.workflow_crud import WorkflowCRUD
+from app.services.amostras_de_dados import amostras_habilitadas
+from app.services.execucao_parcial import ate_o_no
 from app.models.models import Schedule, Workflow
 from app.models.user import User
 from app.schemas.workflow import WorkflowUpdate
@@ -664,6 +666,8 @@ class WorkflowService:
         request: Request = None,
         debug_mode: bool = False,
         idempotency_key: str | None = None,
+        data_preview: bool = False,
+        run_until: str | None = None,
         autenticar_entrada: bool = True,
         workflow: Workflow | None = None,
         triggered_by: str | None = None,
@@ -695,6 +699,12 @@ class WorkflowService:
         exist so the History can tell "scheduled at 03:00" from "manual · so-and-so".
         The "manual" default keeps old callers working.
         """
+        # The admin switch wins over the request (docs/specs/node-data-panels.md
+        # §4.3). Only read when asked, so cron and webhook pay nothing.
+        pediu_amostras = data_preview
+        if data_preview:
+            data_preview = await amostras_habilitadas(self.crud.db)
+
         # ── 1. Idempotency ────────────────────────────────────────────────
         # The key is per USER and per WORKFLOW: it used to be global to the
         # installation, and two users sending `Idempotency-Key: 1` got each
@@ -704,13 +714,30 @@ class WorkflowService:
         cache_key: str | None = None
         if idempotency_key:
             cache_key = f"idempotency:wf_execute:{triggered_by or '-'}:{id_hash}:{idempotency_key}"
+            if run_until:
+                # A partial run is another run: the same key with and without
+                # `run_until` must not answer one with the other.
+                cache_key += f":ate:{run_until}"
             _redis = _get_redis()
             existing = await _redis.get(cache_key)
             if existing:
-                return DispatchResult(id=existing)
+                # What the ORIGINAL run was asked, not what the switch says now:
+                # the admin may have flipped it between the two requests. A key
+                # recorded before this field existed falls back to the current one.
+                if pediu_amostras:
+                    original = await _redis.get(f"{cache_key}:data_preview")
+                    if original is not None:
+                        data_preview = original in ("1", b"1")
+                return DispatchResult(id=existing, data_preview=data_preview)
 
         # ── 2. Carregar e descriptografar ─────────────────────────────────
         wf, definition = await self._load_workflow(id_hash, request, workflow=workflow)
+
+        # ── 2. bis: "Executar até este nó" — only the node and what feeds it.
+        # Cut BEFORE the checks below, so disabled nodes, credentials and
+        # sub-workflows are only those of the nodes that will run.
+        if run_until:
+            definition = ate_o_no(definition, run_until)
 
         # ── 2a. Validar inputs contra payload_schema dos triggers ────────
         _validate_trigger_inputs(definition, inputs)
@@ -808,6 +835,7 @@ class WorkflowService:
         # server's DB.
         result = await self._dispatch_job(
             wf, definition, candidates, inputs, debug_mode,
+            data_preview=data_preview,
             pre_resolved=pre_resolved,
             disabled_nodes=sorted(disabled_now),
             subworkflow_definitions=subworkflow_defs,
@@ -816,11 +844,15 @@ class WorkflowService:
             schedule_id=schedule_id,
         )
 
+        result.data_preview = data_preview
+
         # ── 7. Record idempotency (TTL: 24h) ─────────────────────────────
         if cache_key:
             try:
                 _redis = _get_redis()
                 await _redis.set(cache_key, result.id, ex=REDIS_TTL_24H)
+                if pediu_amostras:
+                    await _redis.set(f"{cache_key}:data_preview", "1" if data_preview else "0", ex=REDIS_TTL_24H)
             except Exception as exc:
                 _logger.warning("Falha ao registrar chave de idempotência no Redis: %s", exc)
 
@@ -846,6 +878,7 @@ class WorkflowService:
         inputs: dict | None,
         debug_mode: bool,
         *,
+        data_preview: bool = False,
         pre_resolved: dict | None = None,
         disabled_nodes: list[str] | None = None,
         subworkflow_definitions: dict | None = None,
@@ -855,6 +888,7 @@ class WorkflowService:
     ) -> DispatchResult:
         return await _dispatch_job(
             wf, definition, candidates, inputs, debug_mode,
+            data_preview=data_preview,
             db=self.crud.db,
             pre_resolved=pre_resolved,
             disabled_nodes=disabled_nodes,

@@ -127,3 +127,14 @@ def in_use(*formas: str):
                 if _count[f] <= 0:
                     del _count[f]
             _publish()
+
+
+def redact_text(texto: str) -> str:
+    """`texto` with every secret in use right now replaced by `***`.
+
+    For text that leaves the process outside a log record, such as the data
+    sample a node sends to the editor (`flow/executor/sample.py`). Outside an
+    `in_use` it returns the text untouched.
+    """
+    formas = _forms
+    return _redact(texto, formas) if formas else texto

@@ -103,6 +103,8 @@ export function originLabel(origem: TriggerSource | string | null | undefined): 
     case "webhook": return "webhook"
     case "schedule": return "agendado"
     case "mcp": return "agente"
+    // "Executar até este nó": only the target and what feeds it ran.
+    case "partial": return "parcial"
     default: return null
   }
 }

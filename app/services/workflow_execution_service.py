@@ -56,6 +56,9 @@ class DispatchResult:
     """Result of dispatching a workflow to an executor."""
     id: str
     has_response_node: bool = False
+    # Whether the executor was asked for data samples (request AND admin switch,
+    # docs/specs/node-data-panels.md §4.3). Set by `start_analysis`.
+    data_preview: bool = False
 
 
 class CandidateList(list):
@@ -691,6 +694,7 @@ async def _dispatch_job(
     debug_mode: bool,
     *,
     db: AsyncSession,
+    data_preview: bool = False,
     pre_resolved: dict | None = None,
     disabled_nodes: list[str] | None = None,
     subworkflow_definitions: dict | None = None,
@@ -752,6 +756,7 @@ async def _dispatch_job(
     try:
         plaintext = await _serializar_payload(
             wf, definition, job_id, inputs, debug_mode,
+            data_preview=data_preview,
             pre_resolved=pre_resolved, disabled_nodes=disabled_nodes,
             subworkflow_definitions=subworkflow_definitions,
         )
@@ -823,6 +828,7 @@ async def _serializar_payload(
     inputs: dict | None,
     debug_mode: bool,
     *,
+    data_preview: bool = False,
     pre_resolved: dict | None,
     disabled_nodes: list[str] | None,
     subworkflow_definitions: dict | None,
@@ -853,6 +859,10 @@ async def _serializar_payload(
         "params":              inputs or {},
         "workspace_id":        wf.workspace_id,
         "debug_mode":          debug_mode,
+        # Data sample per node for the editor's panels (docs/specs/node-data-panels.md).
+        # Already combined with the admin switch by whoever called; an old
+        # executor ignores the key.
+        "data_preview":        bool(data_preview),
         "pinned_outputs":      _safe_pinned_outputs(wf.pinned_outputs, wf.pin_metadata),
         "pin_metadata":        wf.pin_metadata or {},
         # Snapshot of the nodes disabled at dispatch time. SubWorkflowNode

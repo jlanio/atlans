@@ -833,6 +833,28 @@ def historico(monkeypatch):
 
 # ── get_run_events ───────────────────────────────────────────────────────────
 
+async def test_sample_events_come_without_the_data_sample(banco, historico):
+    """The editor's data sample is up to ~48 KB of the node's real rows per event:
+    200 of them would be megabytes in the agent's context. The event stays (the
+    node produced data), the rows do not."""
+    amostra = {"version": 1, "outputs": {"output": {"kind": "table", "rows": [["linha-real"]]}}}
+    historico([
+        _evento("n1", status="completed"),
+        _evento("n1", kind="debug", status="sample", extra={"node_name": "Ler", "output_sample": amostra}),
+    ])
+    async with banco() as db:
+        await create_run(db, task_id=RUN_1, workflow_hash=WF_1, workspace_id=WS_1)
+
+    out = await get_run_events(ctx(), RUN_1)
+
+    eventos = out["untrusted_data"]["events"]
+    assert out["returned"] == 2
+    assert eventos[1]["status"] == "sample"
+    assert eventos[1]["extra"]["output_sample_omitted"] is True
+    assert eventos[1]["extra"]["node_name"] == "Ler"
+    assert "linha-real" not in json.dumps(out)
+
+
 async def test_events_come_out_as_untrusted_data(banco, historico):
     """The log carries node names, script output and errors — text written by people.
 

@@ -10,6 +10,8 @@ import { GisFlowService } from "@/service/GisFlowService"
 import { getWsUrl } from "@/utils/env"
 import { useWorkflowExecutionStore, toRunEvent, eventKind, RawEvent, MAX_RUN_EVENTS, RUN_TERMINAL } from "@/app/stores/workflowExecutionStore"
 import { useKnownColumnsStore } from "@/app/stores/knownColumnsStore"
+import { useNodeSamplesStore, amostraDoEvento, amostrasDosEventos } from "@/app/stores/nodeSamplesStore"
+import type { AmostraDoNo } from "@/types/amostra"
 
 /** Synthetic id the backend uses to signal the end of the run. */
 const WF_COMPLETE = "__workflow_complete__"
@@ -77,6 +79,32 @@ const RUN_NOT_SAVED: Record<SaveSkipReason, [titulo: string, descricao?: string]
  *  watching. Whoever triggers without being the owner hands the task_id to the
  *  owner to attach. */
 let attachToOwner: ((taskId: string) => void) | null = null
+
+/** The finished runs whose columns and samples seed the editor when it opens:
+ *  the newest, and — while those are partial runs ("Executar até este nó") —
+ *  the ones before it down to the last full run. Oldest first. At most 5. */
+export function runsParaSemear<T extends { run_id: string; trigger_source?: string | null }>(recentes: T[]): T[] {
+  const escolhidos: T[] = []
+  for (const run of recentes.slice(0, 5)) {
+    escolhidos.push(run)
+    if (run.trigger_source !== "partial") break
+  }
+  return escolhidos.reverse()
+}
+
+type OpcoesDeExecucao = { runUntil?: string }
+
+/** The owner's "save and run", for a component that only wants to start a run
+ *  (the node modal's "Executar até este nó") without mounting a second copy of
+ *  this hook — each copy fetches the workflow's latest run when it mounts. */
+let executarPeloDono: ((inputs: Record<string, unknown>, opcoes: OpcoesDeExecucao) => Promise<void>) | null = null
+
+/** Starts a run through the canvas that is open. false when there is none. */
+export async function executarNoEditor(inputs: Record<string, unknown> = {}, opcoes: OpcoesDeExecucao = {}): Promise<boolean> {
+  if (!executarPeloDono) return false
+  await executarPeloDono(inputs, opcoes)
+  return true
+}
 
 /** Per-frame buffer item, stamped with its source run.
  *
@@ -354,15 +382,19 @@ export const useExecuteWorkflow = () => {
   const isOwnerRef = useRef(false)
   const attachRef = useRef<(taskId: string) => void>(() => {})
   attachRef.current = (taskId: string) => { attachToRun(taskId) }
+  const executeRef = useRef(handleExecuteWorkflow)
+  executeRef.current = handleExecuteWorkflow
 
   useEffect(() => {
     if (attachToOwner === null) {
       isOwnerRef.current = true
       attachToOwner = (taskId) => attachRef.current(taskId)
+      executarPeloDono = (inputs, opcoes) => executeRef.current(inputs, opcoes)
     }
     return () => {
       if (isOwnerRef.current) {
         attachToOwner = null
+        executarPeloDono = null
         isOwnerRef.current = false
       }
     }
@@ -388,7 +420,9 @@ export const useExecuteWorkflow = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function handleExecuteWorkflow(inputs: Record<string, unknown> = {}) {
+  /** Saves the canvas and runs it. With `runUntil`, only that node and the ones
+   *  it depends on run ("Executar até este nó" in the node modal's panels). */
+  async function handleExecuteWorkflow(inputs: Record<string, unknown> = {}, opcoes: OpcoesDeExecucao = {}) {
 
     const store = useWorkflowExecutionStore.getState()
     if (store.isExecuting)
@@ -435,7 +469,7 @@ export const useExecuteWorkflow = () => {
       return
     }
 
-    const respExec = await executeWorkflow(inputs)
+    const respExec = await executeWorkflow(inputs, opcoes.runUntil)
 
     if (respExec?.error) {
       createToast.error("Ocorreu um erro no workflow!", respExec?.error.message)
@@ -452,6 +486,12 @@ export const useExecuteWorkflow = () => {
       store.resetExecution()
       return
     }
+
+    // The previous samples stay visible, marked as stale, until this run
+    // replaces them node by node. Only an explicit `data_preview: false` back
+    // means the admin switch is off: a response without the field (a server
+    // older than the panels) must not tell the person the admin turned it off.
+    useNodeSamplesStore.getState().beginRun(id, taskId, respExec?.data?.data_preview !== false)
 
     // If this instance is not the socket owner (the trigger came from the webhook's
     // "Testar" tab, for example), it hands the run to whoever governs — instead
@@ -572,9 +612,16 @@ export const useExecuteWorkflow = () => {
       // because keeping the old value would assert columns this run did not produce.
       const batchColumns = new Map<string, Record<string, string[]> | null>()
       let fim: RawEvent | null = null
+      const amostras = useNodeSamplesStore.getState()
       for (const data of lote) {
         if (data.node === WF_COMPLETE) {
           fim = data
+          continue
+        }
+        // Data sample for the node modal's panels: never touches the canvas.
+        if (data.status === "sample") {
+          const sample = amostraDoEvento(data)
+          if (sample && data.node) amostras.apply(id, taskId, data.node, sample)
           continue
         }
         if (eventKind(data) !== "lifecycle") continue
@@ -827,13 +874,14 @@ export const useExecuteWorkflow = () => {
     return ws
   }
 
-  async function executeWorkflow(inputs: Record<string, unknown> = {}) {
+  async function executeWorkflow(inputs: Record<string, unknown> = {}, runUntil?: string) {
     // Note: do NOT check isExecuting here — handleExecuteWorkflow already did so
     // at the start and then called store.startExecution(), which sets
     // isExecuting=true. A guard here (which existed before the Zustand refactor)
     // blocks the POST and leaves respExec=undefined → task_id "undefined" in the
     // WebSocket URL → 4404. That was the real bug observed on the canvas.
-    const data = await GisFlowService.executeWorkflow(id, inputs, debugMode)
+    // The editor always asks for samples; the server decides (admin switch).
+    const data = await GisFlowService.executeWorkflow(id, inputs, debugMode, true, runUntil)
     return data
   }
 
@@ -882,8 +930,11 @@ export const useExecuteWorkflow = () => {
     const aborted = () => cancelled || openedFor !== id
 
     ;(async () => {
-      const resp = await GisFlowService.getObservabilityRuns({ workflow_id: id, limit: 1 })
-      const latest = resp?.data?.runs?.[0]
+      // A few runs, not one: when the latest is a partial run ("Executar até este
+      // nó"), the nodes after its target come from the last full run (below).
+      const resp = await GisFlowService.getObservabilityRuns({ workflow_id: id, limit: 5 })
+      const recentes = resp?.data?.runs ?? []
+      const latest = recentes[0]
       // Aborts if the workflow changed during the await, if there is no run, or if it
       // is not alive. If a manual trigger started in this mount, it does not clobber.
       if (aborted() || !latest) return
@@ -901,19 +952,43 @@ export const useExecuteWorkflow = () => {
         //
         // A LIVE run does not pass through here on purpose: the WebSocket replay
         // redelivers the history and writes the columns through the live path (`fresh`).
-        const detalhe = await GisFlowService.getRunDetail(latest.run_id)
-        if (aborted()) return
-        const stats = detalhe?.data?.node_stats ?? {}
-        const columnsByNode: Record<string, { porPorta: Record<string, string[]>; parciais?: boolean }> = {}
-        for (const [nodeId, stat] of Object.entries(stats)) {
-          if (stat?.output_columns) {
-            // `__truncated__` = the executor's 8KB cut reduced each list to the
-            // first 50 — the suggestion label warns "lista parcial" (partial list).
-            columnsByNode[nodeId] = { porPorta: stat.output_columns, parciais: !!stat.__truncated__ }
+        // A partial run only covers its target and what feeds it: the runs to
+        // seed from are the partial ones on top of the last full run, oldest
+        // first, so a newer run's node wins over an older one's.
+        const aSemear = runsParaSemear(recentes)
+        const amostras: Record<string, AmostraDoNo> = {}
+        const runDaAmostra: Record<string, string> = {}
+        for (const run of aSemear) {
+          const detalhe = await GisFlowService.getRunDetail(run.run_id)
+          if (aborted()) return
+          const stats = detalhe?.data?.node_stats ?? {}
+          const columnsByNode: Record<string, { porPorta: Record<string, string[]>; parciais?: boolean }> = {}
+          for (const [nodeId, stat] of Object.entries(stats)) {
+            if (stat?.output_columns) {
+              // `__truncated__` = the executor's 8KB cut reduced each list to the
+              // first 50 — the suggestion label warns "lista parcial" (partial list).
+              columnsByNode[nodeId] = { porPorta: stat.output_columns, parciais: !!stat.__truncated__ }
+            }
+          }
+          if (Object.keys(columnsByNode).length > 0) {
+            useKnownColumnsStore.getState().semearDoHistorico(id, run.run_id, columnsByNode)
+          }
+          // The data samples of that run, while its history lives (1 h in Redis).
+          // Best-effort like the columns: an expired or forbidden history leaves
+          // the panels on their empty state.
+          try {
+            const eventos = await GisFlowService.getRunEvents(run.run_id)
+            if (aborted()) return
+            for (const [nodeId, amostra] of Object.entries(amostrasDosEventos(eventos?.data?.events ?? []))) {
+              amostras[nodeId] = amostra
+              runDaAmostra[nodeId] = run.run_id
+            }
+          } catch {
+            // a hint, not state
           }
         }
-        if (Object.keys(columnsByNode).length > 0) {
-          useKnownColumnsStore.getState().semearDoHistorico(id, latest.run_id, columnsByNode)
+        if (Object.keys(amostras).length > 0) {
+          useNodeSamplesStore.getState().seedFromHistory(id, latest.run_id, amostras, runDaAmostra)
         }
         return
       }

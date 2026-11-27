@@ -15,7 +15,7 @@ export interface IWorkflowVersion {
 }
 
 // "mcp" = triggered by an agent via the MCP server (personal access token).
-export type TriggerSource = "manual" | "retry" | "webhook" | "schedule" | "mcp"
+export type TriggerSource = "manual" | "retry" | "webhook" | "schedule" | "mcp" | "partial"
 
 /** Category of the error that closed the run: the flow taxonomy + server categories. */
 export type ErrorCategory =

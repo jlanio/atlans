@@ -14,7 +14,7 @@ import type { SaveResult } from "@/app/hooks/workflow/useSaveWorkflow"
 const canvasNodes = [{ id: "n1", position: { x: 0, y: 0 }, data: {} }]
 
 let resultadoDoSave: SaveResult = { outcome: "saved", data: null, error: null }
-const executeWorkflow = vi.fn(async () => ({ data: { task_id: "run-1" }, error: null }))
+const executeWorkflow = vi.fn(async (..._args: unknown[]) => ({ data: { task_id: "run-1" }, error: null }))
 const toasts = vi.hoisted(() => ({ info: vi.fn(), error: vi.fn(), success: vi.fn() }))
 
 vi.mock("next/navigation", () => ({ useParams: () => ({ id: "wf-a" }) }))
@@ -27,7 +27,7 @@ vi.mock("@/service/GisFlowService", () => ({
     // No live run: the re-attach on mount stays out of the way.
     getObservabilityRuns: vi.fn(async () => ({ data: { runs: [] } })),
     getRunDetail: vi.fn(async () => ({ data: { status: "running" } })),
-    executeWorkflow: () => executeWorkflow(),
+    executeWorkflow: (...args: unknown[]) => executeWorkflow(...args),
   },
 }))
 vi.mock("@/utils/createToast", () => ({ createToast: toasts }))
@@ -108,4 +108,31 @@ describe("Executar só despacha com o canvas salvo", () => {
     expect(FakeSocket.abertos.map(s => s.url)).toEqual(["ws://teste/ws/workflow/run-1"])
     view.unmount()
   })
+
+  it("Executar até este nó: o modal pede pelo dono do canvas, com o nó alvo", async () => {
+    resultadoDoSave = { outcome: "saved", data: null, error: null }
+    const { useExecuteWorkflow, executarNoEditor } = await import("@/app/hooks/workflow/useExecuteWorkflow")
+    const view = renderHook(() => useExecuteWorkflow())
+    let ok = false
+    await act(async () => { ok = await executarNoEditor({}, { runUntil: "n1" }) })
+
+    expect(ok).toBe(true)
+    expect(executeWorkflow).toHaveBeenCalledTimes(1)
+    expect(executeWorkflow.mock.calls[0]).toEqual(["wf-a", {}, false, true, "n1"])
+    view.unmount()
+    // No canvas open: nothing to run through.
+    expect(await executarNoEditor({}, { runUntil: "n1" })).toBe(false)
+  })
 })
+
+describe("runsParaSemear", () => {
+  it("parciais por cima da última completa, da mais antiga para a mais nova", async () => {
+    const { runsParaSemear } = await import("@/app/hooks/workflow/useExecuteWorkflow")
+    const r = (run_id: string, trigger_source: string) => ({ run_id, trigger_source })
+    expect(runsParaSemear([r("p2", "partial"), r("p1", "partial"), r("c1", "manual"), r("c0", "manual")]).map(x => x.run_id))
+      .toEqual(["c1", "p1", "p2"])
+    expect(runsParaSemear([r("c1", "schedule"), r("c0", "manual")]).map(x => x.run_id)).toEqual(["c1"])
+    expect(runsParaSemear([])).toEqual([])
+  })
+})
+

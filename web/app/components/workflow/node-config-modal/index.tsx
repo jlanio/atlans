@@ -29,14 +29,28 @@ import { NODE_ICONS } from "@/consts/WorkflowIcons"
 import { TYPE_STYLES, DEFAULT_STYLE } from "@/consts/NodeTypeStyles"
 import { RESERVED_ALIASES, isValidAlias } from "../utils/node-alias"
 import { mudancaDeSaidas, trocasDaChaveRenomeada } from "../utils/variaveis-de-saida"
+import { useResizablePanel } from "@/app/hooks/useResizablePanel"
+import { executarNoEditor } from "@/app/hooks/workflow/useExecuteWorkflow"
+import { useWorkflowExecutionStore } from "@/app/stores/workflowExecutionStore"
+import { createToast } from "@/utils/createToast"
+import { aceitaInsercao, alvoDoCampo, definirAlvo, ehOutroControle } from "./insercao"
 
 // Classes shared by the side panels (Input / Output) and the central modal.
 // Centralizing them avoids visual drift among the 3 panels when adjusting width/shadow.
-// The Input/Output panels add up to 480px with the modal in the middle — they
-// don't fit on a phone alongside anything. They are hidden below `lg`, where the
-// set would start squeezing each other; the central modal still gives access to
-// the configuration, and the input/output data is still in the run panel.
-const SIDE_PANEL = "hidden lg:flex w-[240px] shrink-0 flex-col overflow-y-auto bg-card border border-border/60 shadow-lg pointer-events-auto h-[68vh] z-[1]"
+// The side panels don't fit on a phone alongside anything. They are hidden below
+// `lg`, where the set would start squeezing each other; there the central modal
+// shows Entradas and Saídas as tabs next to the configuration.
+//
+// Width: they used to be 240px, too narrow for the data table
+// (docs/specs/node-data-panels.md §6.4). Now 360px by default, resizable by the
+// outer edge, remembered per browser. The ceiling keeps the three panels on screen.
+const SIDE_PANEL = "relative hidden lg:flex shrink-0 flex-col overflow-hidden bg-card border border-border/60 shadow-lg pointer-events-auto h-[68vh] z-[1]"
+const SIDE_PANEL_SIZE = { defaultWidth: 360, minWidth: 280, maxWidth: 560 } as const
+// Whatever width is saved, the three panels share the screen: each side panel
+// gets at most half of what the central modal (600px, or 60vw) leaves.
+const SIDE_PANEL_MAX = "calc((100vw - min(600px, 60vw)) / 2 - 12px)"
+const RESIZE_HANDLE = "group/alca absolute inset-y-0 z-10 w-2 cursor-col-resize touch-none focus-visible:outline-none"
+const RESIZE_LINE = "absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover/alca:bg-primary group-focus-visible/alca:bg-primary"
 // `max-w-[60vw]` alone gave 216px on a 360px phone — narrower than the node
 // card itself. On a phone the modal takes the screen, minus a margin.
 const MODAL_BOX  = "relative pointer-events-auto bg-background rounded-lg border border-border shadow-lg flex flex-col w-full max-w-[calc(100vw-1.5rem)] h-[88vh] lg:w-[600px] lg:max-w-[60vw] lg:h-[80vh] z-[2]"
@@ -53,6 +67,10 @@ const NodeConfigModal = () => {
   const { setNodes, getNode } = useReactFlow<INodeContext, Edge>()
   const store = useStoreApi<INodeContext, Edge>()
   const { configNodeIdParam, removeConfigNodeParam } = useConfigNodeParams()
+  // The input panel grows to the left (handle on its left edge) and the output
+  // panel to the right — hence the opposite `side` of each.
+  const entrada = useResizablePanel({ storageKey: "atlans:painel-no:entradas:largura", side: "right", ...SIDE_PANEL_SIZE, enabled: !!configNodeIdParam })
+  const saida = useResizablePanel({ storageKey: "atlans:painel-no:saidas:largura", side: "left", ...SIDE_PANEL_SIZE, enabled: !!configNodeIdParam })
   // The modal is a portal WITHOUT a blocking overlay: the canvas stays draggable
   // while it is open. Subscribing to `useNodes()` made the reconciliation below
   // (and the whole form) run on every pointermove. These two subscriptions only
@@ -65,6 +83,10 @@ const NodeConfigModal = () => {
   const [showDiscardDialog, setShowDiscardDialog] = useState(false)
   const [webhookTab, setWebhookTab] = useState<"api" | "test">("api")
   const [configTab, setConfigTab] = useState<"geral" | "helper">("geral")
+  // Below `lg` the side panels don't fit: the modal shows them as tabs instead.
+  const [abaCompacta, setAbaCompacta] = useState<"config" | "entradas" | "saidas">("config")
+  // "Executar até este nó" from the panels goes through the canvas's own runner.
+  const isExecuting = useWorkflowExecutionStore(s => s.isExecuting)
 
   const pinnedNodes = useWorkflowCatalogStore(s => s.pinnedNodes)
   const setPinnedNodes = useWorkflowCatalogStore(s => s.setPinnedNodes)
@@ -96,6 +118,12 @@ const NodeConfigModal = () => {
     setValues(nodeFound?.data.properties)
     setConfigTab("geral")
   }, [configNodeIdParam, nodeFound])
+
+  // Click to insert: a closed modal (or another node) leaves no target behind.
+  useEffect(() => {
+    setAbaCompacta("config")
+    return () => definirAlvo(null)
+  }, [configNodeIdParam])
 
   // Backward compat for the Response node: old workflows have no bodyMode.
   // Deduce it once on open, mirroring the behavior the backend would have
@@ -135,7 +163,14 @@ const NodeConfigModal = () => {
   }
 
   function saveNodeConfig() {
-    if (!nodeFound) return
+    if (!aplicarNoCanvas()) return
+    removeConfigNodeParam()
+  }
+
+  /** Writes the form into the canvas node, without closing the modal.
+   *  Returns the node as written, or null when there is no node. */
+  function aplicarNoCanvas(): INodeContext | null {
+    if (!nodeFound) return null
 
     const propsChanged = JSON.stringify(nodeFound.data.properties) !== JSON.stringify(values)
     const isPinned = pinnedNodes.some(p => p.node_id === nodeFound.id && !p.expired)
@@ -176,7 +211,38 @@ const NodeConfigModal = () => {
     }
 
     setNodeFound(updatedNode)
-    removeConfigNodeParam()
+    return updatedNode
+  }
+
+  /** "Executar até este nó": applies the form (the run executes what is saved,
+   *  and the save reads the canvas), then runs this node and its ancestors. */
+  async function executarAteAqui() {
+    if (!nodeFound || isExecuting) return
+    if (requiresCredential && !values?.credential_id) {
+      createToast.info("Selecione uma credencial", "O nó precisa dela para rodar.")
+      return
+    }
+    const pendente = JSON.stringify(nodeFound.data.properties) !== JSON.stringify(values)
+    if (pendente) {
+      const fixado = pinnedNodes.some(p => p.node_id === nodeFound.id && !p.expired)
+      const escrito = aplicarNoCanvas()
+      if (!escrito) return
+      // Same as Aplicar: says so, since Cancelar can no longer undo it.
+      createToast.info(
+        "Alterações aplicadas para executar",
+        fixado
+          ? "A execução usa o formulário como está. Os dados fixados deste nó foram liberados, porque os parâmetros mudaram."
+          : "A execução usa o formulário como está; Cancelar não desfaz mais estas alterações.",
+      )
+      // The canvas is controlled: the store sees the new node a render later.
+      const alvo = JSON.stringify(escrito.data.properties)
+      for (let i = 0; i < 30 && JSON.stringify(getNode(escrito.id)?.data.properties) !== alvo; i++) {
+        await new Promise(r => requestAnimationFrame(() => r(null)))
+      }
+    }
+    if (!(await executarNoEditor({}, { runUntil: nodeFound.id }))) {
+      createToast.error("Não foi possível executar", "Recarregue o editor e tente de novo.")
+    }
   }
 
   function handleClosePanel() {
@@ -223,15 +289,27 @@ const NodeConfigModal = () => {
       <div className="relative z-10 flex items-center pointer-events-none w-full justify-center px-3 px-safe lg:w-auto lg:px-0">
 
         {/* Left panel — Input (behind the modal, smaller) */}
-        <div className={`${SIDE_PANEL} rounded-l-lg -mr-2`}>
+        <div className={`${SIDE_PANEL} rounded-l-lg -mr-2`} style={{ width: entrada.width, maxWidth: SIDE_PANEL_MAX }}>
+          <div {...entrada.resizeHandleProps} className={`${RESIZE_HANDLE} -left-1`}>
+            <span className={RESIZE_LINE} />
+          </div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 px-4 pt-3 pb-1 shrink-0">
-            Entrada
+            Entradas
           </p>
-          <InputInspector nodeFound={nodeFound} />
+          <InputInspector nodeFound={nodeFound} onExecutarAteAqui={workflowId ? executarAteAqui : undefined} executando={isExecuting} />
         </div>
 
         {/* Central modal — in front, larger, overlaps the panels' edges */}
-        <div className={MODAL_BOX}>
+        <div
+          className={MODAL_BOX}
+          // The last text field focused here is where a click in Entradas inserts.
+          // Any other form control drops it, so a click never lands in a field the
+          // person has already left.
+          onFocusCapture={e => {
+            if (aceitaInsercao(e.target)) definirAlvo(alvoDoCampo(e.target))
+            else if (ehOutroControle(e.target)) definirAlvo(null)
+          }}
+        >
         {/* Rich header with the type's icon and color */}
         {(() => {
           const nodeType = nodeFound?.data.type ?? ""
@@ -255,6 +333,8 @@ const NodeConfigModal = () => {
                   <div className="group flex items-center gap-1">
                     <input
                       type="text"
+                      // The node's name, not a parameter: never a target of click-to-insert.
+                      data-sem-insercao
                       value={aliasTitle}
                       placeholder={nodeFound?.data.alias ?? ""}
                       className={`w-full px-1 text-sm font-medium text-foreground bg-transparent border-b transition-colors outline-none ${
@@ -314,8 +394,33 @@ const NodeConfigModal = () => {
           )
         })()}
 
+        {/* Below lg: the side panels as tabs of the modal */}
+        <div role="tablist" aria-label="Seções do nó" className="flex shrink-0 gap-4 border-b px-4 lg:hidden">
+          {([["config", "Parâmetros"], ["entradas", "Entradas"], ["saidas", "Saídas"]] as const).map(([id, rotulo]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={abaCompacta === id}
+              onClick={() => setAbaCompacta(id)}
+              className={`min-h-10 border-b-2 text-xs font-medium transition-colors ${
+                abaCompacta === id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {rotulo}
+            </button>
+          ))}
+        </div>
+        {abaCompacta !== "config" && (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:hidden">
+            {abaCompacta === "entradas"
+              ? <InputInspector nodeFound={nodeFound} onExecutarAteAqui={workflowId ? executarAteAqui : undefined} executando={isExecuting} />
+              : <OutputPreview nodeFound={nodeFound} onExecutarAteAqui={workflowId ? executarAteAqui : undefined} executando={isExecuting} />}
+          </div>
+        )}
+
         {/* Body — configuration form */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className={`flex-1 flex-col min-h-0 overflow-hidden ${abaCompacta === "config" ? "flex" : "hidden lg:flex"}`}>
 
           {/* Tab bar — only for nodes with a helper */}
           {hasConfigTabs && (
@@ -440,11 +545,14 @@ const NodeConfigModal = () => {
         </div>{/* fim modal central */}
 
         {/* Right panel — Output (behind the modal, smaller) */}
-        <div className={`${SIDE_PANEL} rounded-r-lg -ml-2`}>
+        <div className={`${SIDE_PANEL} rounded-r-lg -ml-2`} style={{ width: saida.width, maxWidth: SIDE_PANEL_MAX }}>
+          <div {...saida.resizeHandleProps} className={`${RESIZE_HANDLE} -right-1`}>
+            <span className={RESIZE_LINE} />
+          </div>
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70 px-4 pt-3 pb-1 shrink-0">
-            Saída
+            Saídas
           </p>
-          <OutputPreview nodeFound={nodeFound} />
+          <OutputPreview nodeFound={nodeFound} onExecutarAteAqui={workflowId ? executarAteAqui : undefined} executando={isExecuting} />
         </div>
 
       </div>{/* end of the 3-panel wrapper */}

@@ -23,6 +23,7 @@ import { DriveSettingsSection } from "@/app/components/admin/settings/drive"
 import { StorageUsageSection } from "@/app/components/admin/settings/armazenamento"
 import { NodesAdminSection } from "@/app/components/admin/settings/nodes"
 import { WorkspaceTrashSection } from "@/app/components/admin/settings/lixeira-de-workspaces"
+import { DataPreviewSection, DATA_PREVIEW_HELP_TEXT } from "@/app/components/admin/settings/amostras-de-dados"
 
 // The presentation of the model section: what always applies, and what each
 // extension adds (switching the model may change one of its accounts).
@@ -324,6 +325,16 @@ export default function SettingsPage() {
               ) : policies ? (
                 <IsolationFloorSection items={policies} onChanged={refetchPolicies} />
               ) : null}
+            </SettingsSection>
+          )}
+
+          {section === "execucao" && (
+            <SettingsSection
+              id="amostras-de-dados"
+              titulo="Amostras de dados no editor"
+              apoio={DATA_PREVIEW_HELP_TEXT}
+            >
+              <DataPreviewSection />
             </SettingsSection>
           )}
 

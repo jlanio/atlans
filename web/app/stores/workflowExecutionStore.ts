@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { Edge } from '@xyflow/react'
 import { INodeStatusWorkFlow, IStatusWorkflow, StatusNodeStatusWorkFlow, StatusWorkflow } from '@/context/useFlowContext'
+import { resumoDaAmostra } from '@/types/amostra'
 
 /** Origin of the line — separate from the lifecycle (`status`).
  *
@@ -113,6 +114,8 @@ export interface RawEvent {
     unresolved_edges?: ArestaSemDado[]
     overwritten_inputs?: EntradaSobrescrita[]
     subworkflow_parent_node?: string
+    /** Only on `status: "sample"` events (docs/specs/node-data-panels.md). */
+    output_sample?: unknown
   } | null
 }
 
@@ -151,7 +154,8 @@ export function toRunEvent(data: RawEvent): RunEvent {
     status,
     node_name: data.extra?.node_name,
     node_type: data.extra?.node_type,
-    message: data.extra?.message ?? data.error ?? data.message ?? null,
+    message: data.extra?.message ?? data.error ?? data.message
+      ?? (status === 'sample' ? resumoDaAmostra(data.extra?.output_sample) : null),
     lines: data.extra?.lines ?? null,
     duration_ms: data.duration_ms ?? null,
     output_keys: data.extra?.output_keys ?? null,
