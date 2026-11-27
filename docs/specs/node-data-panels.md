@@ -179,11 +179,21 @@ Pure function, no I/O, unit-tested in isolation. Runs in `asyncio.to_thread` lik
 
 ### 5.3 Redaction
 
-- Every string cell and JSON leaf goes through the live-secret redaction. `segredos_vivos`
-  exposes a new `redact_text(texto: str) -> str` that applies the forms currently
-  `in_use` (the same `_redact` it uses for log records).
-- Columns or keys whose name matches `password|passwd|secret|token|api[_-]?key|authorization`
-  (case-insensitive) have their values replaced by `"***"`.
+- Every string cell and JSON leaf goes through the log's pattern redaction
+  (`redacao_log.scrub_text`: DSN with a password, Bearer/Basic, `token=`, `authkey=`,
+  PATs, AWS keys, PEM blocks) and the live-secret redaction (`segredos_vivos.redact_text`).
+  The live one alone is not enough: `in_use` ends before the sample is built.
+- Columns or keys whose name matches
+  `password|passwd|secret|token|api[_-]?key|authorization|senha|cookie|credential|private[_-]?key`
+  (case-insensitive) have their WHOLE value replaced by `"***"`, a list or dict included.
+
+### 5.3a Map preview
+
+A table with a geometry column also carries `map: {w, h, features}`: the sample's
+geometries scaled into a 0..1000 box (y down), simplified, rounded to integers and
+capped (1,500 points, 40 parts per feature). `features` are `{d, area}` (SVG path,
+`area` = filled) or `{p: [x, y]}` (point). No basemap and no reprojection. It is the
+first thing dropped when the sample does not fit the budget.
 
 ### 5.4 Budget
 
@@ -259,7 +269,24 @@ The copy button stays on every draggable row.
 
 `SIDE_PANEL` stops being `w-[240px]`: default 360 px, resizable by a drag handle on the
 inner edge, min 280 px, max `35vw`, width remembered in `localStorage`. The center form
-keeps its current width; on screens below `lg` nothing changes.
+keeps its current width. Below `lg` the side panels are hidden and the modal shows
+**Parâmetros / Entradas / Saídas** as tabs instead.
+
+### 6.5 Usability (after the first review)
+
+- **Executar até este nó.** The panels' empty states offer it. `POST /execute` takes
+  `run_until: <node id>`; the server cuts the definition down to that node and its
+  ancestors before every check (`app/services/execucao_parcial.py`), so an old executor
+  runs it like any other. The modal applies its pending form to the canvas first, and
+  the run goes through the canvas's runner (`executarNoEditor`), which saves first.
+- **Click to insert.** The last text field focused in the modal (or a Monaco editor)
+  is the target; clicking a key, column or JSON key in Entradas inserts at its caret
+  (`node-config-modal/insercao.ts`). With no target, it copies. Dragging still works.
+- **Mapa** view when the output has a map preview (§5.3a).
+- **Row count** in bold above the table ("20 de 3.412 linhas"), and a column filter
+  when there are more than 6 columns.
+- The canvas's **debug** switch is now **Resumo no log** (same `debug_mode` in the API):
+  with the panels, all it still adds is the summary lines in the run log.
 
 ## 7. Security and privacy
 

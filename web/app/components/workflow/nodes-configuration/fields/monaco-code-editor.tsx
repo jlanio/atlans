@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react"
 import Editor, { loader, OnMount } from "@monaco-editor/react"
 import type * as Monaco from "monaco-editor"
+import { definirAlvo } from "@/app/components/workflow/node-config-modal/insercao"
 import { TbArrowsMaximize, TbArrowsMinimize } from "react-icons/tb"
 import {
   Dialog,
@@ -132,18 +133,29 @@ function applyMonokaiTheme(monaco: typeof Monaco) {
 function exposeInsert(
   editor: Monaco.editor.IStandaloneCodeEditor,
   onEditorReady?: (fn: (text: string) => void) => void,
+  label?: string,
 ) {
-  onEditorReady?.((text: string) => {
+  const inserir = (text: string) => {
     const selection = editor.getSelection()
     if (!selection) return
     editor.executeEdits("insert-hint", [{ range: selection, text, forceMoveMarkers: true }])
     editor.focus()
+  }
+  onEditorReady?.(inserir)
+  // Click to insert from the Entradas panel (node-config-modal/insercao.ts):
+  // focusing the editor makes it the target, at its own caret.
+  editor.onDidFocusEditorText(() => {
+    definirAlvo({
+      rotulo: label || "editor de código",
+      inserir,
+      vivo: () => !!editor.getDomNode()?.isConnected,
+    })
   })
 }
 
 // ─── Editor inline ─────────────────────────────────────────────────────────
 
-function InlineEditor({ value, onChange, onEditorReady, minHeight = 180, language = "python", onExpand }: MonacoCodeEditorProps & { onExpand(): void }) {
+function InlineEditor({ value, onChange, onEditorReady, minHeight = 180, language = "python", onExpand, label }: MonacoCodeEditorProps & { onExpand(): void }) {
   // Height in px managed as state — Monaco needs an explicit value
   const [height, setHeight] = useState(minHeight)
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null)
@@ -151,7 +163,7 @@ function InlineEditor({ value, onChange, onEditorReady, minHeight = 180, languag
   const handleMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor
     applyMonokaiTheme(monaco)
-    exposeInsert(editor, onEditorReady)
+    exposeInsert(editor, onEditorReady, label)
 
     const updateHeight = () => {
       const lineCount = editor.getModel()?.getLineCount() ?? 1

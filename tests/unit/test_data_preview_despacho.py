@@ -150,6 +150,18 @@ async def test_execute_sem_o_campo_nao_pede_amostras(rota_execute):
     assert resp.json()["data_preview"] is False
 
 
+@pytest.mark.asyncio
+async def test_execute_repassa_executar_ate_este_no(rota_execute):
+    """`run_until` ("Executar até este nó") reaches the service; without it, None."""
+    ac, svc = rota_execute
+    svc.start_analysis = AsyncMock(return_value=wes.DispatchResult(id="task-1"))
+    resp = await ac.post("/workflows/wf-1/execute", json={"inputs": {}, "run_until": "no-7"})
+    assert resp.status_code == 202, resp.text
+    assert svc.start_analysis.await_args.kwargs["run_until"] == "no-7"
+    await ac.post("/workflows/wf-1/execute", json={"inputs": {}})
+    assert svc.start_analysis.await_args.kwargs["run_until"] is None
+
+
 @pytest.fixture
 def rota_admin(client, mock_current_user):
     from app.api.dependencies import get_db

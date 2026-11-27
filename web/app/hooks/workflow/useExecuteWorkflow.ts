@@ -79,6 +79,20 @@ const RUN_NOT_SAVED: Record<SaveSkipReason, [titulo: string, descricao?: string]
  *  owner to attach. */
 let attachToOwner: ((taskId: string) => void) | null = null
 
+type OpcoesDeExecucao = { runUntil?: string }
+
+/** The owner's "save and run", for a component that only wants to start a run
+ *  (the node modal's "Executar até este nó") without mounting a second copy of
+ *  this hook — each copy fetches the workflow's latest run when it mounts. */
+let executarPeloDono: ((inputs: Record<string, unknown>, opcoes: OpcoesDeExecucao) => Promise<void>) | null = null
+
+/** Starts a run through the canvas that is open. false when there is none. */
+export async function executarNoEditor(inputs: Record<string, unknown> = {}, opcoes: OpcoesDeExecucao = {}): Promise<boolean> {
+  if (!executarPeloDono) return false
+  await executarPeloDono(inputs, opcoes)
+  return true
+}
+
 /** Per-frame buffer item, stamped with its source run.
  *
  *  The stamp exists because a delayed flush is asynchronous by nature: the rAF
@@ -355,15 +369,19 @@ export const useExecuteWorkflow = () => {
   const isOwnerRef = useRef(false)
   const attachRef = useRef<(taskId: string) => void>(() => {})
   attachRef.current = (taskId: string) => { attachToRun(taskId) }
+  const executeRef = useRef(handleExecuteWorkflow)
+  executeRef.current = handleExecuteWorkflow
 
   useEffect(() => {
     if (attachToOwner === null) {
       isOwnerRef.current = true
       attachToOwner = (taskId) => attachRef.current(taskId)
+      executarPeloDono = (inputs, opcoes) => executeRef.current(inputs, opcoes)
     }
     return () => {
       if (isOwnerRef.current) {
         attachToOwner = null
+        executarPeloDono = null
         isOwnerRef.current = false
       }
     }
@@ -389,7 +407,9 @@ export const useExecuteWorkflow = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function handleExecuteWorkflow(inputs: Record<string, unknown> = {}) {
+  /** Saves the canvas and runs it. With `runUntil`, only that node and the ones
+   *  it depends on run ("Executar até este nó" in the node modal's panels). */
+  async function handleExecuteWorkflow(inputs: Record<string, unknown> = {}, opcoes: OpcoesDeExecucao = {}) {
 
     const store = useWorkflowExecutionStore.getState()
     if (store.isExecuting)
@@ -436,7 +456,7 @@ export const useExecuteWorkflow = () => {
       return
     }
 
-    const respExec = await executeWorkflow(inputs)
+    const respExec = await executeWorkflow(inputs, opcoes.runUntil)
 
     if (respExec?.error) {
       createToast.error("Ocorreu um erro no workflow!", respExec?.error.message)
@@ -841,14 +861,14 @@ export const useExecuteWorkflow = () => {
     return ws
   }
 
-  async function executeWorkflow(inputs: Record<string, unknown> = {}) {
+  async function executeWorkflow(inputs: Record<string, unknown> = {}, runUntil?: string) {
     // Note: do NOT check isExecuting here — handleExecuteWorkflow already did so
     // at the start and then called store.startExecution(), which sets
     // isExecuting=true. A guard here (which existed before the Zustand refactor)
     // blocks the POST and leaves respExec=undefined → task_id "undefined" in the
     // WebSocket URL → 4404. That was the real bug observed on the canvas.
     // The editor always asks for samples; the server decides (admin switch).
-    const data = await GisFlowService.executeWorkflow(id, inputs, debugMode, true)
+    const data = await GisFlowService.executeWorkflow(id, inputs, debugMode, true, runUntil)
     return data
   }
 

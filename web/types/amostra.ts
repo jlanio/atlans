@@ -26,6 +26,18 @@ export interface AmostraTabela {
   columns: AmostraColuna[]
   rows: AmostraCelula[][]
   truncated: { rows: boolean; columns: boolean; cells: boolean }
+  /** The sample's geometries drawn small, for the Mapa view (absent when the
+   *  table has no geometry, or the map did not fit in the event). */
+  map?: AmostraMapa
+}
+
+/** SVG preview of the sample's geometries: coordinates already scaled into
+ *  `0..w` × `0..h` (y pointing down), in the layer's own CRS. */
+export interface AmostraMapa {
+  w: number
+  h: number
+  /** `d`: an SVG path (`area` = filled polygon, else a line); `p`: a point. */
+  features: Array<{ d: string; area: boolean } | { p: [number, number] }>
 }
 
 export interface AmostraJson {

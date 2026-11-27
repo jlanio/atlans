@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { TbPlayerPlay, TbEraser, TbLoader, TbBug, TbPlayerStop, TbAlertTriangle } from "react-icons/tb"
+import { TbPlayerPlay, TbEraser, TbLoader, TbListDetails, TbPlayerStop, TbAlertTriangle } from "react-icons/tb"
 import { GisFlowService } from "@/service/GisFlowService"
 import { useWorkspace } from "@/context/WorkspaceContext"
 import { avisoDePreFlight } from "@/app/components/workspace/politica"
@@ -127,20 +127,25 @@ const ExecuteWorkflow = () => {
       <div className="flex items-center gap-2">
         <Tooltip>
           <TooltipTrigger asChild>
+            {/* Was "debug". With the node panels showing each node's data, what
+                this switch still adds is only the summary lines in the run log —
+                so that is what it is called now (the API keeps `debug_mode`). */}
             <Button
               onClick={() => setDebugMode(!debugMode)}
               variant="outline"
               size="icon"
-              className={debugMode ? "border-yellow-500 text-yellow-500 hover:text-yellow-500" : undefined}
+              aria-label="Resumo no log"
+              aria-pressed={debugMode}
+              className={debugMode ? "border-primary text-primary hover:text-primary" : undefined}
             >
-              <TbBug size={18} />
+              <TbListDetails size={18} />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="right">
-            <p className="text-xs max-w-[200px]">
-              {debugMode
-                ? "Debug ativo — o log da execução mostra um resumo das entradas e saídas de cada nó"
-                : "Ativar debug — resumo das entradas e saídas de cada nó no log da execução"}
+            <p className="text-xs max-w-[220px]">
+              <span className="font-semibold">Resumo no log: {debugMode ? "ligado" : "desligado"}</span>
+              <br />
+              Escreve no log da execução um resumo das entradas e saídas de cada nó. Os dados de cada nó aparecem nos painéis Entradas e Saídas de qualquer forma.
             </p>
           </TooltipContent>
         </Tooltip>

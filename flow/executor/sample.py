@@ -241,6 +241,95 @@ def _table_sample(df, max_rows: int, max_cols: int, max_cell: int) -> dict:
     return sample
 
 
+# ── Map preview ──────────────────────────────────────────────────────────────
+#
+# The truncated WKT says nothing about where a feature is. The panel's Mapa view
+# draws the sample's geometries as SVG: coordinates scaled into a 0..1000 box
+# (y pointing down), simplified, rounded to integers and capped in total, so the
+# whole preview stays around 10 KB. No basemap and no reprojection: it shows the
+# shapes and how they sit relative to each other, in the layer's own CRS.
+
+MAP_SIZE = 1000
+MAP_MAX_POINTS = 1500
+MAP_MAX_PARTS = 40
+
+
+def _xy(coords, minx, maxy, escala, limite):
+    if len(coords) > limite:
+        passo = -(-len(coords) // limite)  # ceil
+        ultimo = coords[-1]
+        coords = coords[::passo]
+        if (coords[-1] != ultimo).any():
+            import numpy as np
+            coords = np.vstack([coords, ultimo])
+    return [(int(round((x - minx) * escala)), int(round((maxy - y) * escala))) for x, y in coords[:, :2]]
+
+
+def _partes(geom):
+    """(kind, [coordinate arrays]) of each simple part of `geom`."""
+    import shapely
+    tipo = geom.geom_type
+    if tipo in ("Polygon",):
+        aneis = [geom.exterior, *geom.interiors]
+        return [("area", [shapely.get_coordinates(a) for a in aneis])]
+    if tipo in ("LineString", "LinearRing"):
+        return [("line", [shapely.get_coordinates(geom)])]
+    if tipo == "Point":
+        return [("point", [shapely.get_coordinates(geom)])]
+    partes = []
+    for parte in getattr(geom, "geoms", []):
+        partes.extend(_partes(parte))
+    return partes
+
+
+def _map_preview(geoms) -> "dict | None":
+    """`{w, h, features: [{d, area} | {p: [x, y]}]}` of the sample's geometries,
+    or None when there is nothing to draw. Never raises."""
+    try:
+        import shapely
+        validas = [g for g in geoms if g is not None and not g.is_empty]
+        if not validas:
+            return None
+        minx, miny, maxx, maxy = shapely.total_bounds(validas)
+        span = max(maxx - minx, maxy - miny)
+        if not math.isfinite(span):
+            return None
+        escala = MAP_SIZE / span if span > 0 else 1.0
+        por_feicao = max(8, MAP_MAX_POINTS // len(validas))
+        features = []
+        for g in validas:
+            if span > 0 and shapely.get_num_coordinates(g) > por_feicao:
+                simples = shapely.simplify(g, span / 500, preserve_topology=False)
+                g = simples if not simples.is_empty else g
+            # A multi-geometry with thousands of parts: the first ones draw the idea.
+            partes = _partes(g)[:MAP_MAX_PARTS]
+            aneis_total = sum(len(aneis) for _, aneis in partes) or 1
+            limite = max(4, por_feicao // aneis_total)
+            caminho = []
+            area = False
+            for kind, aneis in partes:
+                for coords in aneis:
+                    if not len(coords):
+                        continue
+                    pts = _xy(coords, minx, maxy, escala, limite)
+                    if kind == "point":
+                        features.append({"p": list(pts[0])})
+                        continue
+                    caminho.append("M" + " ".join(f"{x} {y}" for x, y in pts) + ("Z" if kind == "area" else ""))
+                    area = area or kind == "area"
+            if caminho:
+                features.append({"d": "".join(caminho), "area": area})
+        if not features:
+            return None
+        return {
+            "w": max(1, int(round((maxx - minx) * escala))),
+            "h": max(1, int(round((maxy - miny) * escala))),
+            "features": features,
+        }
+    except Exception:
+        return None
+
+
 # ── Everything else ──────────────────────────────────────────────────────────
 
 def _json_value(valor: Any, depth: int, max_cell: int) -> "tuple[Any, bool]":
@@ -338,12 +427,23 @@ def build_output_sample(
             if _is_table(valor):
                 tabelas[chave] = valor
                 result["outputs"][chave] = _table_sample(valor, max_rows, max_cols, max_cell)
+                geometria = _geometry_column(valor)
+                if geometria is not None:
+                    mapa = _map_preview(list(valor[geometria].head(max_rows)))
+                    if mapa is not None:
+                        result["outputs"][chave]["map"] = mapa
             else:
                 v, cut = _json_value(valor, 0, max_cell)
                 result["outputs"][chave] = {"kind": "json", "value": v, "truncated": cut}
         except Exception:
             result["outputs"][chave] = {"kind": "omitted", "reason": "error"}
 
+    if _size(result) <= budget_bytes:
+        return result
+
+    # 0. The map previews go first: the rows are what the panel is about.
+    for chave in tabelas:
+        result["outputs"][chave].pop("map", None)
     if _size(result) <= budget_bytes:
         return result
 

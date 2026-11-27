@@ -31,6 +31,7 @@ from app.core.scheduling.hooks import (
 from app.core.utils.encryption import decrypt_workflow_connections, encrypt_workflow_connections
 from app.crud.workflow_crud import WorkflowCRUD
 from app.services.amostras_de_dados import amostras_habilitadas
+from app.services.execucao_parcial import ate_o_no
 from app.models.models import Schedule, Workflow
 from app.models.user import User
 from app.schemas.workflow import WorkflowUpdate
@@ -666,6 +667,7 @@ class WorkflowService:
         debug_mode: bool = False,
         idempotency_key: str | None = None,
         data_preview: bool = False,
+        run_until: str | None = None,
         autenticar_entrada: bool = True,
         workflow: Workflow | None = None,
         triggered_by: str | None = None,
@@ -712,6 +714,10 @@ class WorkflowService:
         cache_key: str | None = None
         if idempotency_key:
             cache_key = f"idempotency:wf_execute:{triggered_by or '-'}:{id_hash}:{idempotency_key}"
+            if run_until:
+                # A partial run is another run: the same key with and without
+                # `run_until` must not answer one with the other.
+                cache_key += f":ate:{run_until}"
             _redis = _get_redis()
             existing = await _redis.get(cache_key)
             if existing:
@@ -726,6 +732,12 @@ class WorkflowService:
 
         # ── 2. Carregar e descriptografar ─────────────────────────────────
         wf, definition = await self._load_workflow(id_hash, request, workflow=workflow)
+
+        # ── 2. bis: "Executar até este nó" — only the node and what feeds it.
+        # Cut BEFORE the checks below, so disabled nodes, credentials and
+        # sub-workflows are only those of the nodes that will run.
+        if run_until:
+            definition = ate_o_no(definition, run_until)
 
         # ── 2a. Validar inputs contra payload_schema dos triggers ────────
         _validate_trigger_inputs(definition, inputs)

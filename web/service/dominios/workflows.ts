@@ -7,7 +7,9 @@ import type {
 
 // ── Workflows ──────────────────────────────────────────────────────────────
 
-export function executeWorkflow(id: string, inputs: Record<string, unknown> = {}, debugMode = false, dataPreview = false) {
+export function executeWorkflow(
+  id: string, inputs: Record<string, unknown> = {}, debugMode = false, dataPreview = false, runUntil?: string,
+) {
   // Uses the authenticated endpoint (/workflows/{id}/execute) instead of
   // /webhook/execute — the canvas is a JWT-authenticated user session (manual
   // intent), not an external caller. The /webhook/execute endpoint requires a
@@ -19,6 +21,8 @@ export function executeWorkflow(id: string, inputs: Record<string, unknown> = {}
     inputs,
     debug_mode: debugMode,
     data_preview: dataPreview,
+    // "Executar até este nó": only this node and the ones it depends on run.
+    ...(runUntil ? { run_until: runUntil } : {}),
   })
 }
 

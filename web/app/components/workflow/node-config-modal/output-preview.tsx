@@ -9,11 +9,15 @@ import { useNodeSamplesStore } from "@/app/stores/nodeSamplesStore"
 import { resolveNodeAlias } from "../utils/node-alias"
 import { saidasDoNo } from "../utils/node-ports"
 import {
-  AbasDeChave, FilhosDaChave, SeletorDeVisao, SeloAnterior, SemAmostra, VisaoDaSaida, useVisaoLembrada,
+  AbasDeChave, BotaoExecutarAteAqui, FilhosDaChave, SeletorDeVisao, SeloAnterior, SemAmostra, VisaoDaSaida,
+  useVisaoLembrada,
 } from "./data-view"
 
 interface OutputPreviewProps {
   nodeFound: INodeContext
+  /** "Executar até este nó" (runs this node and the ones it depends on). */
+  onExecutarAteAqui?: () => void
+  executando?: boolean
 }
 
 /**
@@ -23,7 +27,7 @@ interface OutputPreviewProps {
  * Schema (keys, columns, example values), Tabela and JSON. Status, duration,
  * error and the pin state stay at the top.
  */
-const OutputPreview = ({ nodeFound }: OutputPreviewProps) => {
+const OutputPreview = ({ nodeFound, onExecutarAteAqui, executando = false }: OutputPreviewProps) => {
   const workflowId = useParams<{ id?: string }>()?.id
   const statusWorkflow = useWorkflowExecutionStore(s => s.statusWorkflow)
   const registro = useNodeSamplesStore(s => (workflowId && s.workflowId === workflowId ? s.byNode[nodeFound.id] : undefined))
@@ -62,7 +66,7 @@ const OutputPreview = ({ nodeFound }: OutputPreviewProps) => {
       <div className="flex flex-col gap-2 border-b px-3 pb-2 pt-1">
         <div className="flex items-center gap-2">
           <span className="min-w-0 flex-1 truncate text-xs font-semibold">{alias}</span>
-          <SeletorDeVisao visao={visao} onChange={setVisao} />
+          <SeletorDeVisao visao={visao} onChange={setVisao} comMapa={saidaAtual?.kind === "table" && !!saidaAtual.map} />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {nodeStatus && (
@@ -116,18 +120,23 @@ const OutputPreview = ({ nodeFound }: OutputPreviewProps) => {
                 )
               })}
               {!registro && (
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  {desligado
-                    ? "Amostras de dados desligadas pelo administrador."
-                    : "Execute o fluxo para ver as colunas e um valor de exemplo de cada saída."}
-                </p>
+                <div className="mt-1 flex flex-col items-start gap-1.5">
+                  <p className="text-[10px] text-muted-foreground">
+                    {desligado
+                      ? "Amostras de dados desligadas pelo administrador."
+                      : "Execute para ver as colunas e um valor de exemplo de cada saída."}
+                  </p>
+                  {!desligado && onExecutarAteAqui && (
+                    <BotaoExecutarAteAqui onExecutar={onExecutarAteAqui} executando={executando} compacto />
+                  )}
+                </div>
               )}
             </div>
           )
         ) : saidaAtual ? (
           <VisaoDaSaida saida={saidaAtual} visao={visao} onVerJson={() => setVisao("json")} />
         ) : (
-          <SemAmostra motivo={motivoVazio} deQuem="deste nó" />
+          <SemAmostra motivo={motivoVazio} deQuem="deste nó" onExecutar={onExecutarAteAqui} executando={executando} />
         )}
       </div>
     </div>

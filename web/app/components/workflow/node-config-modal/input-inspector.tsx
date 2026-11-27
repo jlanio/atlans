@@ -10,12 +10,15 @@ import { useNodeSamplesStore, type AmostraRegistrada } from "@/app/stores/nodeSa
 import { resolveNodeAlias } from "../utils/node-alias"
 import { saidasDoNo } from "../utils/node-ports"
 import {
-  AbasDeChave, FilhosDaChave, SeletorDeVisao, SeloAnterior, SemAmostra, VisaoDaSaida,
-  copiar, iniciarArrasto, useVisaoLembrada,
+  AbasDeChave, BotaoExecutarAteAqui, DicaDeInsercao, FilhosDaChave, SeletorDeVisao, SeloAnterior, SemAmostra,
+  VisaoDaSaida, copiar, iniciarArrasto, inserirOuCopiar, useVisaoLembrada,
 } from "./data-view"
 
 interface InputInspectorProps {
   nodeFound: INodeContext
+  /** "Executar até este nó" (runs this node and the ones it depends on). */
+  onExecutarAteAqui?: () => void
+  executando?: boolean
 }
 
 const SEM_AMOSTRAS: Record<string, AmostraRegistrada> = {}
@@ -67,7 +70,7 @@ function ancestraisIndiretos(nodeId: string, edges: Edge[], diretos: Set<string>
  * Keys and columns can be dragged into form fields: a key inserts
  * `{{ Alias.key }}` (or the variable name in the Python Script), a column its name.
  */
-const InputInspector = ({ nodeFound }: InputInspectorProps) => {
+const InputInspector = ({ nodeFound, onExecutarAteAqui, executando = false }: InputInspectorProps) => {
   const workflowId = useParams<{ id?: string }>()?.id
   const edges = useEdges()
   const allNodes = useNodes<INodeContext>()
@@ -236,7 +239,7 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
               </optgroup>
             )}
           </select>
-          <SeletorDeVisao visao={visao} onChange={setVisao} />
+          <SeletorDeVisao visao={visao} onChange={setVisao} comMapa={saidaAtual?.kind === "table" && !!saidaAtual.map} />
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {status && (
@@ -254,6 +257,7 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
           )}
         </div>
         {visao !== "schema" && <AbasDeChave chaves={chaves} atual={chaveAtual} onChange={setChave} />}
+        <DicaDeInsercao python={isPythonNode} />
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
@@ -293,7 +297,17 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
                     {isWired
                       ? <TbGripVertical className="h-3 w-3 shrink-0 text-muted-foreground/50 group-hover:text-muted-foreground" />
                       : <span className="h-3 w-3 shrink-0" />}
-                    <code className="min-w-0 flex-1 truncate text-[11px] font-mono font-medium text-primary">
+                    <code
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-[11px] font-mono font-medium text-primary",
+                        isWired && "cursor-pointer hover:underline",
+                      )}
+                      // A real button would nest the copy button inside it; the
+                      // row is keyboard-reachable through that button and the
+                      // fields below, and the click is a shortcut for the drag.
+                      onClick={isWired ? () => inserirOuCopiar(expression) : undefined}
+                      title={isWired ? `Clique ou arraste para inserir ${expression}` : undefined}
+                    >
                       {key}
                       {variavel !== key && (
                         // The port is the name that matters to whoever writes the
@@ -330,11 +344,16 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
             })}
 
             {!registro && (
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                {desligado
-                  ? "Amostras de dados desligadas pelo administrador."
-                  : "Execute o fluxo para ver as colunas e um valor de exemplo de cada saída."}
-              </p>
+              <div className="mt-1 flex flex-col items-start gap-1.5">
+                <p className="text-[10px] text-muted-foreground">
+                  {desligado
+                    ? "Amostras de dados desligadas pelo administrador."
+                    : "Execute para ver as colunas e um valor de exemplo de cada saída."}
+                </p>
+                {!desligado && onExecutarAteAqui && (
+                  <BotaoExecutarAteAqui onExecutar={onExecutarAteAqui} executando={executando} compacto />
+                )}
+              </div>
             )}
 
             {status?.error && (
@@ -347,9 +366,10 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
             visao={visao}
             exprDe={ligada(chaveAtual) ? exprDoCaminho(chaveAtual, variavelAtual) : undefined}
             onVerJson={() => setVisao("json")}
+            inserivel={ligada(chaveAtual)}
           />
         ) : (
-          <SemAmostra motivo={motivoVazio} deQuem={`de ${alias}`} />
+          <SemAmostra motivo={motivoVazio} deQuem={`de ${alias}`} onExecutar={onExecutarAteAqui} executando={executando} />
         )}
 
         {(() => {
@@ -377,8 +397,8 @@ const InputInspector = ({ nodeFound }: InputInspectorProps) => {
 
         <p className="text-[10px] text-muted-foreground">
           {isPythonNode
-            ? <>Arraste uma chave para inserir o nome da variável Python, ou uma coluna para inserir o nome dela.</>
-            : <>Arraste uma chave para inserir a expressão Jinja, ou uma coluna para inserir o nome dela. <TbCopy className="inline h-3 w-3" /> copia.</>}
+            ? <>Uma chave insere o nome da variável Python; uma coluna, o nome dela.</>
+            : <>Uma chave insere a expressão Jinja; uma coluna, o nome dela. <TbCopy className="inline h-3 w-3" /> copia.</>}
         </p>
       </div>
     </div>

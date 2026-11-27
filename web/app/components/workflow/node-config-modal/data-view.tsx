@@ -2,28 +2,34 @@
 
 /**
  * Data views shared by the node modal's Entradas and Saídas panels
- * (docs/specs/node-data-panels.md §6.2): Schema / Tabela / JSON over the
- * sample each node sends after a run started from the editor.
+ * (docs/specs/node-data-panels.md §6.2): Schema / Tabela / Mapa / JSON over
+ * the sample each node sends after a run started from the editor.
  *
- * Drag rules are the panels' (the same as before the redesign): a key inserts
+ * Insert rules are the panels' (the same as before the redesign): a key inserts
  * `{{ Alias.key }}`, a column inserts its name, a JSON leaf inserts
- * `{{ Alias.key.path }}`. Whoever renders decides whether something is
- * draggable at all (`arrastavel`).
+ * `{{ Alias.key.path }}` — by dragging, or by clicking with a form field
+ * selected (insercao.ts). Whoever renders decides whether something can be
+ * inserted at all (`arrastavel` / `inserivel`).
  */
-import { useCallback, useEffect, useState } from "react"
-import { TbCopy, TbGripVertical, TbPlayerPlay, TbTableOff } from "react-icons/tb"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { TbCopy, TbGripVertical, TbLoader, TbPlayerPlay, TbPointer, TbSearch, TbTableOff } from "react-icons/tb"
 import { cn } from "@/lib/utils"
+import { createToast } from "@/utils/createToast"
 import {
-  isGeometria, type AmostraCelula, type AmostraColuna, type AmostraSaida, type AmostraTabela,
+  isGeometria, type AmostraCelula, type AmostraColuna, type AmostraMapa, type AmostraSaida, type AmostraTabela,
 } from "@/types/amostra"
+import { inserirNoAlvo, useRotuloDoAlvo } from "./insercao"
 
-export type Visao = "schema" | "tabela" | "json"
+export type Visao = "schema" | "tabela" | "mapa" | "json"
 
 const VISOES: { id: Visao; rotulo: string }[] = [
   { id: "schema", rotulo: "Schema" },
   { id: "tabela", rotulo: "Tabela" },
+  { id: "mapa", rotulo: "Mapa" },
   { id: "json", rotulo: "JSON" },
 ]
+
+const VISOES_VALIDAS = new Set<string>(VISOES.map(v => v.id))
 
 /** The view picked in each panel, remembered across modals (per browser). */
 export function useVisaoLembrada(painel: "entradas" | "saidas", comDados: boolean): [Visao, (v: Visao) => void] {
@@ -33,7 +39,7 @@ export function useVisaoLembrada(painel: "entradas" | "saidas", comDados: boolea
   useEffect(() => {
     try {
       const salva = window.localStorage.getItem(chave)
-      if (salva === "schema" || salva === "tabela" || salva === "json") setEscolhida(salva)
+      if (salva && VISOES_VALIDAS.has(salva)) setEscolhida(salva as Visao)
     } catch { /* no storage: the default applies */ }
   }, [chave])
 
@@ -46,14 +52,16 @@ export function useVisaoLembrada(painel: "entradas" | "saidas", comDados: boolea
   return [escolhida ?? (comDados ? "tabela" : "schema"), definir]
 }
 
-export function SeletorDeVisao({ visao, onChange, desabilitar = [] }: {
+export function SeletorDeVisao({ visao, onChange, desabilitar = [], comMapa = false }: {
   visao: Visao
   onChange: (v: Visao) => void
   desabilitar?: Visao[]
+  /** The current output has geometries to draw: shows the Mapa view. */
+  comMapa?: boolean
 }) {
   return (
     <div role="group" aria-label="Visão dos dados" className="inline-flex shrink-0 rounded-md bg-muted p-0.5">
-      {VISOES.map(({ id, rotulo }) => {
+      {VISOES.filter(v => comMapa || v.id !== "mapa").map(({ id, rotulo }) => {
         const off = desabilitar.includes(id)
         return (
           <button
@@ -113,6 +121,56 @@ export function copiar(texto: string) {
   navigator.clipboard?.writeText(texto).catch(() => { /* clipboard refused: nothing to do */ })
 }
 
+/** Click on a key/column: into the selected form field, or to the clipboard
+ *  when no field was selected yet (and the toast says how to insert directly). */
+export function inserirOuCopiar(texto: string) {
+  const onde = inserirNoAlvo(texto)
+  if (onde) {
+    createToast.success(`Inserido em “${onde}”`, texto)
+    return
+  }
+  copiar(texto)
+  createToast.info("Copiado", "Clique antes num campo do formulário para inserir direto nele.")
+}
+
+/** One line over the Entradas data saying what a click does right now. */
+export function DicaDeInsercao({ python = false }: { python?: boolean }) {
+  const alvo = useRotuloDoAlvo()
+  return (
+    <p className="flex items-start gap-1.5 rounded-md bg-primary/5 px-2 py-1.5 text-[11px] leading-snug text-foreground/80">
+      <TbPointer className="mt-px h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+      <span>
+        {alvo
+          ? <>Clique numa {python ? "chave ou coluna" : "chave, coluna ou valor"} para inserir em <strong className="font-semibold">“{alvo}”</strong>.</>
+          : <>Selecione um campo do formulário e clique numa chave ou coluna para inserir. Arrastar também funciona.</>}
+      </span>
+    </p>
+  )
+}
+
+/** "Executar até este nó": the button of the panels' empty states. */
+export function BotaoExecutarAteAqui({ onExecutar, executando, compacto = false }: {
+  onExecutar: () => void
+  executando: boolean
+  compacto?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onExecutar}
+      disabled={executando}
+      title="Roda só este nó e os nós de que ele depende"
+      className={cn(
+        "inline-flex items-center justify-center gap-1.5 rounded-md bg-primary font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-70",
+        compacto ? "min-h-8 px-2.5 text-[11px]" : "min-h-9 px-3 text-xs",
+      )}
+    >
+      {executando ? <TbLoader className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <TbPlayerPlay className="h-3.5 w-3.5" aria-hidden />}
+      {executando ? "Executando…" : "Executar até este nó"}
+    </button>
+  )
+}
+
 /** Text of a cell as the table shows it. */
 export function textoDaCelula(valor: AmostraCelula): string {
   if (valor === null || valor === undefined) return "null"
@@ -130,26 +188,81 @@ function rotuloDoTipo(tipo: string): string {
 
 const NUMERICO = new Set(["int", "float"])
 
-export function VisaoTabela({ saida }: { saida: AmostraTabela }) {
+/** Above this many columns the table offers a filter by column name. */
+const COLUNAS_PARA_FILTRO = 6
+
+export function VisaoTabela({ saida, inserivel = false }: {
+  saida: AmostraTabela
+  /** Clicking (or dragging) a column header inserts its name. */
+  inserivel?: boolean
+}) {
+  const [filtro, setFiltro] = useState("")
+  const termo = filtro.trim().toLowerCase()
+  const visiveis = useMemo(
+    () => saida.columns
+      .map((c, i) => ({ c, i }))
+      .filter(({ c }) => !termo || c.name.toLowerCase().includes(termo)),
+    [saida.columns, termo],
+  )
   if (saida.columns.length === 0) {
     return <p className="py-4 text-center text-xs text-muted-foreground">Tabela sem colunas.</p>
   }
+  const parcial = saida.rows.length < saida.rows_total
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="text-xs font-semibold tabular-nums text-foreground">
+          {parcial
+            ? `${saida.rows.length} de ${saida.rows_total.toLocaleString("pt-BR")} linhas`
+            : `${saida.rows_total.toLocaleString("pt-BR")} linha(s)`}
+        </span>
+        <span className="text-[10px] text-muted-foreground">
+          {saida.columns.length} coluna(s){saida.truncated.columns ? " (cortadas)" : ""}
+          {saida.crs ? ` · ${saida.crs}` : ""}
+          {parcial ? " · amostra" : ""}
+        </span>
+      </div>
+      {saida.columns.length > COLUNAS_PARA_FILTRO && (
+        <label className="flex h-7 items-center gap-1.5 rounded-md border px-2 focus-within:ring-1 focus-within:ring-primary">
+          <TbSearch className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="sr-only">Filtrar colunas</span>
+          <input
+            type="search"
+            value={filtro}
+            onChange={e => setFiltro(e.target.value)}
+            placeholder="Filtrar colunas"
+            // Not a target for click-to-insert: it filters the panel itself.
+            data-sem-insercao
+            className="min-w-0 flex-1 bg-transparent text-[11px] outline-none"
+          />
+          {termo && <span className="shrink-0 text-[10px] text-muted-foreground">{visiveis.length}/{saida.columns.length}</span>}
+        </label>
+      )}
       <div className="max-h-[52vh] overflow-auto rounded-md border">
         <table className="w-max min-w-full border-collapse text-[11px] tabular-nums">
           <thead>
             <tr>
               <th className="sticky top-0 z-[1] bg-muted px-2 py-1 text-right font-normal text-muted-foreground">#</th>
-              {saida.columns.map(c => (
+              {visiveis.map(({ c }) => (
                 <th
                   key={c.name}
-                  draggable
-                  onDragStart={e => iniciarArrasto(e, c.name)}
-                  title="Arraste para inserir o nome da coluna"
-                  className="sticky top-0 z-[1] cursor-grab whitespace-nowrap bg-muted px-2 py-1 text-left font-semibold active:cursor-grabbing"
+                  draggable={inserivel}
+                  onDragStart={inserivel ? e => iniciarArrasto(e, c.name) : undefined}
+                  className={cn(
+                    "sticky top-0 z-[1] whitespace-nowrap bg-muted px-2 py-1 text-left font-semibold",
+                    inserivel && "cursor-grab active:cursor-grabbing",
+                  )}
                 >
-                  {c.name}
+                  {inserivel ? (
+                    <button
+                      type="button"
+                      onClick={() => inserirOuCopiar(c.name)}
+                      title={`Clique ou arraste para inserir ${c.name}`}
+                      className="text-left font-semibold text-primary hover:underline"
+                    >
+                      {c.name}
+                    </button>
+                  ) : c.name}
                   <span className="block font-mono text-[9px] font-normal lowercase text-muted-foreground">{rotuloDoTipo(c.type)}</span>
                 </th>
               ))}
@@ -159,7 +272,8 @@ export function VisaoTabela({ saida }: { saida: AmostraTabela }) {
             {saida.rows.map((linha, i) => (
               <tr key={i} className="hover:bg-primary/5">
                 <td className="border-t px-2 py-1 text-right text-muted-foreground">{i + 1}</td>
-                {linha.map((valor, j) => {
+                {visiveis.map(({ i: j }) => {
+                  const valor = linha[j]
                   const col = saida.columns[j]
                   const geo = isGeometria(valor)
                   return (
@@ -182,17 +296,45 @@ export function VisaoTabela({ saida }: { saida: AmostraTabela }) {
           </tbody>
         </table>
       </div>
-      <div className="flex flex-wrap justify-between gap-2 text-[10px] text-muted-foreground">
-        <span>
-          {saida.rows.length === saida.rows_total
-            ? `${saida.rows_total.toLocaleString("pt-BR")} linha(s)`
-            : `Mostrando ${saida.rows.length} de ${saida.rows_total.toLocaleString("pt-BR")} linhas (amostra)`}
-        </span>
-        <span>
-          {saida.columns.length} coluna(s){saida.truncated.columns ? " (cortadas)" : ""}
-          {saida.crs ? ` · ${saida.crs}` : ""}
-        </span>
-      </div>
+    </div>
+  )
+}
+
+/** The sample's geometries drawn small (no basemap, the layer's own CRS). */
+export function VisaoMapa({ mapa, saida }: { mapa: AmostraMapa; saida: AmostraTabela }) {
+  const margem = Math.max(mapa.w, mapa.h) * 0.04
+  const raio = Math.max(mapa.w, mapa.h) * 0.008
+  const traco = Math.max(mapa.w, mapa.h) * 0.003
+  const desenhadas = mapa.features.length
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <svg
+        role="img"
+        aria-label={`Mapa das ${desenhadas} feições da amostra`}
+        viewBox={`${-margem} ${-margem} ${mapa.w + 2 * margem} ${mapa.h + 2 * margem}`}
+        preserveAspectRatio="xMidYMid meet"
+        className="max-h-[52vh] w-full rounded-md border bg-sky-50/60 dark:bg-sky-950/30"
+      >
+        {mapa.features.map((f, i) => (
+          "p" in f
+            ? <circle key={i} cx={f.p[0]} cy={f.p[1]} r={raio} className="fill-primary stroke-background" strokeWidth={traco * 0.6} />
+            : (
+              <path
+                key={i}
+                d={f.d}
+                fillRule="evenodd"
+                strokeWidth={traco}
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+                className={f.area ? "fill-primary/20 stroke-primary" : "fill-none stroke-primary"}
+              />
+            )
+        ))}
+      </svg>
+      <span className="text-[10px] text-muted-foreground">
+        {desenhadas} feição(ões) da amostra{saida.rows_total > saida.rows.length ? ` de ${saida.rows_total.toLocaleString("pt-BR")}` : ""}
+        {saida.crs ? ` · ${saida.crs}` : ""} · sem mapa de fundo
+      </span>
     </div>
   )
 }
@@ -232,14 +374,20 @@ function JsonNo({ valor, caminho, nivel, exprDe }: {
           return (
             <span key={k}>
               {"\n"}{recuo}
-              <span
-                draggable={!!expr}
-                onDragStart={expr ? e => iniciarArrasto(e, expr) : undefined}
-                title={expr ? `Arraste para inserir ${expr}` : undefined}
-                className={cn("text-primary", expr && "cursor-grab hover:underline")}
-              >
-                &quot;{k}&quot;
-              </span>
+              {expr ? (
+                <button
+                  type="button"
+                  draggable
+                  onDragStart={e => iniciarArrasto(e, expr)}
+                  onClick={() => inserirOuCopiar(expr)}
+                  title={`Clique ou arraste para inserir ${expr}`}
+                  className="cursor-pointer font-mono text-primary hover:underline"
+                >
+                  &quot;{k}&quot;
+                </button>
+              ) : (
+                <span className="text-primary">&quot;{k}&quot;</span>
+              )}
               : <JsonNo valor={v} caminho={[...caminho, k]} nivel={nivel + 1} exprDe={exprDe} />{i < entradas.length - 1 ? "," : ""}
             </span>
           )
@@ -284,15 +432,18 @@ export function SaidaOmitida({ motivo }: { motivo: string }) {
 }
 
 /** Table or JSON view of one output, with the "not a table" fallback. */
-export function VisaoDaSaida({ saida, visao, exprDe, onVerJson }: {
+export function VisaoDaSaida({ saida, visao, exprDe, onVerJson, inserivel = false }: {
   saida: AmostraSaida
-  visao: "tabela" | "json"
+  visao: "tabela" | "mapa" | "json"
   exprDe?: (caminho: string[]) => string
   onVerJson: () => void
+  /** Column headers insert their name on click/drag (Entradas panel). */
+  inserivel?: boolean
 }) {
   if (saida.kind === "omitted") return <SaidaOmitida motivo={saida.reason} />
-  if (visao === "tabela") {
-    if (saida.kind === "table") return <VisaoTabela saida={saida} />
+  if (visao === "mapa" && saida.kind === "table" && saida.map) return <VisaoMapa mapa={saida.map} saida={saida} />
+  if (visao === "tabela" || visao === "mapa") {
+    if (saida.kind === "table") return <VisaoTabela saida={saida} inserivel={inserivel} />
     return (
       <div className="flex flex-col items-center gap-2 py-6 text-center text-xs text-muted-foreground">
         <span className="font-medium text-foreground">Esta saída não é uma tabela</span>
@@ -343,7 +494,6 @@ export function FilhosDaChave({ saida, colunasConhecidas, exprDe, arrastavel }: 
           key={f.nome}
           draggable={arrastavel}
           onDragStart={arrastavel ? e => iniciarArrasto(e, f.arrasto) : undefined}
-          title={arrastavel ? `Arraste para inserir ${f.arrasto}` : undefined}
           className={cn(
             "group grid grid-cols-[12px_minmax(0,1fr)_auto] items-center gap-1.5 rounded px-1 py-0.5",
             arrastavel ? "cursor-grab hover:bg-muted active:cursor-grabbing" : "cursor-default",
@@ -351,7 +501,18 @@ export function FilhosDaChave({ saida, colunasConhecidas, exprDe, arrastavel }: 
         >
           {arrastavel ? <TbGripVertical className="h-3 w-3 text-muted-foreground/40 group-hover:text-muted-foreground" /> : <span />}
           <span className="min-w-0 truncate">
-            <code className="font-mono text-[11px]">{f.nome}</code>
+            {arrastavel ? (
+              <button
+                type="button"
+                onClick={() => inserirOuCopiar(f.arrasto)}
+                title={`Clique ou arraste para inserir ${f.arrasto}`}
+                className="font-mono text-[11px] hover:text-primary hover:underline"
+              >
+                {f.nome}
+              </button>
+            ) : (
+              <code className="font-mono text-[11px]">{f.nome}</code>
+            )}
             {f.tipo && <span className="ml-1.5 font-mono text-[9px] text-muted-foreground">{f.tipo}</span>}
           </span>
           <span className="flex items-center gap-1">
@@ -376,16 +537,21 @@ export function FilhosDaChave({ saida, colunasConhecidas, exprDe, arrastavel }: 
 }
 
 /** Empty state of the data views: why there is nothing yet, and what to do. */
-export function SemAmostra({ motivo, deQuem }: {
+export function SemAmostra({ motivo, deQuem, onExecutar, executando = false }: {
   motivo: "nao-executado" | "desligado" | "sem-amostra"
   /** Whose data would show here, with the preposition: "de Municipios", "deste nó". */
   deQuem: string
+  /** "Executar até este nó". Omitted: no button (samples off, or no workflow). */
+  onExecutar?: () => void
+  executando?: boolean
 }) {
   const texto = motivo === "desligado"
     ? "O administrador desligou as amostras de dados nesta instalação."
     : motivo === "sem-amostra"
       ? `A última execução não trouxe dados ${deQuem}. O nó pode não ter rodado, ou o histórico da execução já expirou (1 hora).`
-      : `Execute o fluxo para ver os dados ${deQuem}.`
+      : onExecutar
+        ? `Roda só os nós necessários e mostra as primeiras linhas ${deQuem}, sem sair desta tela.`
+        : `Execute o fluxo para ver os dados ${deQuem}.`
   return (
     <div className="flex flex-col items-center gap-1.5 px-2 py-5 text-center text-xs text-muted-foreground">
       {motivo === "desligado" ? <TbTableOff size={22} /> : <TbPlayerPlay size={20} />}
@@ -393,6 +559,9 @@ export function SemAmostra({ motivo, deQuem }: {
         {motivo === "desligado" ? "Amostras de dados desligadas" : "Ainda sem dados de execução"}
       </span>
       <span className="max-w-[34ch]">{texto}</span>
+      {onExecutar && motivo !== "desligado" && (
+        <div className="mt-2"><BotaoExecutarAteAqui onExecutar={onExecutar} executando={executando} /></div>
+      )}
     </div>
   )
 }

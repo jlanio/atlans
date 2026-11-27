@@ -200,3 +200,41 @@ def test_um_valor_estranho_nao_derruba_as_outras_saidas():
 def test_tabela_vazia(vazio):
     out = build_output_sample({"output": vazio})["outputs"]["output"]
     assert out["kind"] == "table" and out["rows_total"] == 0 and out["rows"] == []
+
+
+def test_tabela_com_geometria_traz_o_mapa_da_amostra():
+    from shapely.geometry import MultiPolygon
+    grande = Point(0, 0).buffer(10, quad_segs=2000)
+    gdf = gpd.GeoDataFrame(
+        {"n": range(4)},
+        geometry=[grande, Point(30, 5), LineString([(0, 0), (40, 20)]),
+                  MultiPolygon([Point(50, 50).buffer(3), Point(60, 40).buffer(2)])],
+        crs="EPSG:4674",
+    )
+    mapa = build_output_sample({"output": gdf})["outputs"]["output"]["map"]
+    assert max(mapa["w"], mapa["h"]) == 1000
+    tipos = [("p" if "p" in f else ("area" if f["area"] else "line")) for f in mapa["features"]]
+    assert tipos == ["area", "p", "line", "area"]
+    # Simplified and capped: the 8,000-vertex circle does not travel whole.
+    assert len(json.dumps(mapa)) < 15_000
+    for f in mapa["features"]:
+        coords = f["p"] if "p" in f else [int(v) for v in f["d"].replace("M", " ").replace("Z", " ").split()]
+        assert all(0 <= v <= 1000 for v in coords)
+
+
+def test_tabela_sem_geometria_nao_tem_mapa():
+    out = build_output_sample({"output": pd.DataFrame({"a": [1, 2]})})["outputs"]["output"]
+    assert "map" not in out
+
+
+def test_mapa_sai_antes_das_linhas_quando_estoura_o_orcamento():
+    gdf = gpd.GeoDataFrame(
+        {"texto": ["z" * 120] * 20},
+        geometry=[Point(i, i).buffer(1, quad_segs=200) for i in range(20)],
+    )
+    cheio = build_output_sample({"output": gdf})["outputs"]["output"]
+    assert "map" in cheio
+    sem_folga = len(json.dumps(build_output_sample({"output": gdf}))) - len(json.dumps(cheio["map"])) + 100
+    out = build_output_sample({"output": gdf}, budget_bytes=sem_folga)["outputs"]["output"]
+    assert "map" not in out
+    assert len(out["rows"]) == 20

@@ -35,6 +35,7 @@ class ExecutePayload(BaseModel):
     inputs: Dict[str, Any] = Field(default_factory=dict, description="Initial inputs for trigger nodes")
     debug_mode: bool = Field(default=False, description="Se true, o executor publica no WebSocket um resumo das entradas e saídas de cada nó concluído")
     data_preview: bool = Field(default=False, description="Se true (e o admin não desligou), o executor envia uma amostra dos dados de cada nó para os painéis do editor")
+    run_until: Optional[str] = Field(default=None, min_length=1, max_length=200, description="Executa só este nó e os nós de que ele depende (\"Executar até este nó\" do editor)")
 
 class PortalSettingsSchema(BaseModel):
     portal_access: str = Field(..., pattern="^(disabled|public|private)$")
@@ -574,6 +575,7 @@ async def execute_workflow(
             request=request,
             debug_mode=payload.debug_mode,
             data_preview=payload.data_preview,
+            run_until=payload.run_until,
             idempotency_key=idempotency_key,
             # The authorization dependency already loaded and decrypted this
             # workflow: without passing the object along, the dispatch redid the SELECT and
